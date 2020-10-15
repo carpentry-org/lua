@@ -12,7 +12,8 @@ is a simple way to embed Lua in Carp that is currently WIP.
 ; lua, so we need to tell Carp about that directory
 (Lua.setup "lua")
 
-(Lua.evaluate "1 + 1")
+; will return a string representation of the value
+(Lua.evaluate "1 + 1") ; => "2"
 ```
 
 <hr/>
