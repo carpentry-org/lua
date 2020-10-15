@@ -1,0 +1,40 @@
+(register-type Lua "lua_State")
+(defmodule Lua
+  (defndynamic setup [location]
+    (eval
+      (list 'do
+        (list 'system-include (Dynamic.String.concat [location "/lua.h"]))
+        (list 'system-include (Dynamic.String.concat [location "/lauxlib.h"]))
+        (list 'system-include (Dynamic.String.concat [location "/lualib.h"]))
+        (list 'add-cflag "-llua"))))
+
+  (register new (Fn [] &Lua) "luaL_newstate")
+  (register libs (Fn [&Lua] ()) "luaL_openlibs")
+  (register close (Fn [&Lua] ()) "lua_close")
+
+  (register loadbuffer (Fn [&Lua (Ptr CChar) Int (Ptr CChar)] Int) "luaL_loadbuffer")
+  (register call (Fn [&Lua Int Int Int] Int) "lua_pcall")
+  (register do-string (Fn [&Lua (Ptr CChar)] Int) "luaL_dostring")
+
+  (deftemplate to-string (Fn [&Lua Int] (Ptr CChar)) "char* $NAME(Lua* l, int i)" "$DECL { return (char*) lua_tostring(l, i); }")
+
+  (defmacro with-lua-as [name body]
+    (let [s (gensym)]
+      (list 'let-do [name '(Lua.new)
+                     s body]
+        (list 'Lua.close name)
+        s)))
+
+  (defmacro with-lua [body]
+    (list 'Lua.with-lua-as 'lua body))
+
+  (defn evaluate [s]
+    (Lua.with-lua
+      (do
+        (libs lua)
+        (let [code (do-string lua (cstr &(fmt "return tostring(%s);" s)))
+                 res (from-cstr (to-string lua -1))]
+          (if (/= 0 code)
+            (Result.Error res)
+            (Result.Success res))))))
+)
