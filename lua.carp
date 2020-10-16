@@ -1,5 +1,16 @@
+(defmodule String
+  (defn from-cstr-or [cs default]
+    (if (null? cs) default (from-cstr cs)))
+)
+
 (register-type Lua "lua_State")
 (defmodule Lua
+  (register OK Int "LUA_OK")
+  (register RUNTIME_ERROR Int "LUA_ERRRUN")
+  (register MEMORY_ERROR Int "LUA_ERRMEM")
+  (register HANDLER_ERROR Int "LUA_ERRERR")
+  (register GC_ERROR Int "LUA_ERRGCMM")
+
   (defndynamic setup [location]
     (eval
       (list 'do
@@ -12,7 +23,24 @@
   (register libs (Fn [&Lua] ()) "luaL_openlibs")
   (register close (Fn [&Lua] ()) "lua_close")
 
-  (register loadbuffer (Fn [&Lua (Ptr CChar) Int (Ptr CChar)] Int) "luaL_loadbuffer")
+  (register pop (Fn [&Lua Int] ()) "lua_pop")
+  (register push-bool (Fn [&Lua Bool] ()) "lua_pushboolean")
+  (register push-global-table (Fn [&Lua] ()) "lua_pushglobaltable")
+  (register push-int (Fn [&Lua Int] ()) "lua_pushinteger")
+  (register push-light-user-data (Fn [&Lua (Ptr ())] ()) "lua_pushlightuserdata")
+  (register push-nil (Fn [&Lua] ()) "lua_pushnil")
+  (register push-float (Fn [&Lua Float] ()) "lua_pushnumber")
+  (register push-thread (Fn [&Lua] ()) "lua_pushthread")
+  (register push-copy (Fn [&Lua Int] ()) "lua_pushvalue")
+  (register get-global (Fn [&Lua (Ptr CChar)] ()) "lua_getglobal")
+  (register set-global (Fn [&Lua (Ptr CChar)] ()) "lua_setglobal")
+  (register get-bool (Fn [&Lua Int] Bool) "lua_toboolean")
+  (register get-int (Fn [&Lua Int] Int) "lua_tointeger")
+  (register get-float (Fn [&Lua Int] Float) "lua_tonumber")
+  (register get-string (Fn [&Lua Int] (Ptr CChar)) "lua_tostring")
+  (register get-user-data (Fn [&Lua Int] (Ptr ())) "lua_touserdata")
+
+  (register load-buffer (Fn [&Lua (Ptr CChar) Int (Ptr CChar)] Int) "luaL_loadbuffer")
   (register call (Fn [&Lua Int Int Int] Int) "lua_pcall")
   (register do-string (Fn [&Lua (Ptr CChar)] Int) "luaL_dostring")
 
@@ -28,13 +56,13 @@
   (defmacro with-lua [body]
     (list 'Lua.with-lua-as 'lua body))
 
+  (defmacro with-lua-do [:rest body]
+    (list 'Lua.with-lua-as 'lua (cons 'do body)))
+
   (defn evaluate [s]
-    (Lua.with-lua
-      (do
-        (libs lua)
-        (let [code (do-string lua (cstr &(fmt "return tostring(%s);" s)))
-                 res (from-cstr (to-string lua -1))]
-          (if (/= 0 code)
-            (Result.Error res)
-            (Result.Success res))))))
+    (Lua.with-lua-do
+      (libs lua)
+      (let [code (do-string lua (cstr &(fmt "return tostring(%s);" s)))
+               res (from-cstr-or (to-string lua -1) @"")]
+        ((if (/= OK code) Result.Error Result.Success) res))))
 )
