@@ -65,4 +65,23 @@
       (let [code (do-string lua (cstr &(fmt "return tostring(%s);" s)))
                res (from-cstr-or (to-string lua -1) @"")]
         ((if (/= OK code) Result.Error Result.Success) res))))
+
+  (defn val [lua name value]
+    (let [res (Lua.do-string lua (cstr &(fmt "return %s" value)))]
+      (if (= res Lua.OK)
+        (do
+          (Lua.set-global lua (cstr name))
+          res)
+        res)))
+
+  (defmacro fun [lua name args body]
+    (list 'Lua.val lua (Symbol.str name)
+      (String.concat [
+        "function("
+        (if (empty? args)
+          ""
+          (Dynamic.reduce (fn [acc s] (String.concat [acc "," (Symbol.str s)])) (Symbol.str (car args)) (cdr args)))
+        ") "
+        body
+        " end"])))
 )

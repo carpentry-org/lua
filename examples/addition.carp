@@ -7,13 +7,11 @@
     ; set up the libraries
     (Lua.libs lua)
 
-    ; some lua code that returns a function
-    (let [body "return function(x, y) return x + y end"]
-      (when (/= (Lua.do-string lua (cstr body)) Lua.OK)
-        (IO.errorln "creating function failed")))
+    ; define a function f
+    (when (/= (Lua.fun lua f [x y] "return x + y") Lua.OK)
+      (IO.errorln "defining `f` failed"))
 
-    ; call the function "f" and put it on the stack
-    (Lua.set-global lua (cstr "f"))
+    ; put f on the stack
     (Lua.get-global lua (cstr "f"))
 
     ; put some values on the stack
