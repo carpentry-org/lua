@@ -11,13 +11,13 @@
   (register HANDLER_ERROR Int "LUA_ERRERR")
   (register GC_ERROR Int "LUA_ERRGCMM")
 
-  (defndynamic setup [location]
+  (defndynamic setup [location :rest cflag]
     (eval
       (list 'do
         (list 'system-include (Dynamic.String.concat [location "/lua.h"]))
         (list 'system-include (Dynamic.String.concat [location "/lauxlib.h"]))
         (list 'system-include (Dynamic.String.concat [location "/lualib.h"]))
-        (list 'add-cflag "-llua"))))
+        (list 'add-cflag (Dynamic.String.concat ["-l" (if (> (length cflag) 0) (car cflag) "lua")])))))
 
   (register new (Fn [] &Lua) "luaL_newstate")
   (register libs (Fn [&Lua] ()) "luaL_openlibs")
