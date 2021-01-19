@@ -13,11 +13,11 @@
 
   (defndynamic setup [location :rest cflag]
     (eval
-      (list 'do
-        (list 'system-include (Dynamic.String.concat [location "/lua.h"]))
-        (list 'system-include (Dynamic.String.concat [location "/lauxlib.h"]))
-        (list 'system-include (Dynamic.String.concat [location "/lualib.h"]))
-        (list 'add-cflag (Dynamic.String.concat ["-l" (if (> (length cflag) 0) (car cflag) "lua")])))))
+      `(do
+        (system-include %(Dynamic.String.concat [location "/lua.h"]))
+        (system-include %(Dynamic.String.concat [location "/lauxlib.h"]))
+        (system-include %(Dynamic.String.concat [location "/lualib.h"]))
+        (add-cflag %(Dynamic.String.concat ["-l" (if (> (length cflag) 0) (car cflag) "lua")])))))
 
   (register new (Fn [] &Lua) "luaL_newstate")
   (register libs (Fn [&Lua] ()) "luaL_openlibs")
@@ -48,16 +48,16 @@
 
   (defmacro with-lua-as [name body]
     (let [s (gensym)]
-      (list 'let-do [name '(Lua.new)
-                     s body]
-        (list 'Lua.close name)
-        s)))
+      `(let-do [%name (Lua.new)
+                %s %body]
+        (Lua.close %name)
+        %s)))
 
   (defmacro with-lua [body]
-    (list 'Lua.with-lua-as 'lua body))
+    `(Lua.with-lua-as lua %body))
 
   (defmacro with-lua-do [:rest body]
-    (list 'Lua.with-lua-as 'lua (cons 'do body)))
+    `(Lua.with-lua-as lua (do %@body)))
 
   (defn evaluate [s]
     (Lua.with-lua-do
