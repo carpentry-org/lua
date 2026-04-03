@@ -1,24 +1,27 @@
-(load "https://github.com/carpentry-org/lua@master")
+(load "https://github.com/carpentry-org/lua@0.1.0")
 
 (Lua.setup "lua")
 
 (defn main []
   (Lua.with-lua-do
-    ; set up the libraries
     (Lua.libs lua)
 
-    ; define a function f
+    ; define a function using the Lua.fun macro
     (when (/= (Lua.fun lua f [x y] "return x + y") Lua.OK)
       (IO.errorln "defining `f` failed"))
 
-    ; put f on the stack
+    ; call it via the low-level API
     (Lua.get-global lua (cstr "f"))
-
-    ; put some values on the stack
     (Lua.push-int lua 1)
     (Lua.push-float lua 1.5f)
-
-    ; call the whole thing, should result in 2.5
-    ; so we’re ignoring the error handling here
     (ignore (Lua.call lua 2 1 0))
-    (IO.println &(str &(Lua.get-float lua -1)))))
+    (IO.println &(fmt "low-level: %s" &(str &(Lua.get-float lua -1))))
+    (Lua.pop lua 1)
+
+    ; call it via Luax.call-fn
+    (let [result (Luax.call-fn lua f Lua.get-float
+                   (Lua.push-int 2)
+                   (Lua.push-float 2.5f))]
+      (match result
+        (Result.Success v) (IO.println &(fmt "Luax: %s" &(str &v)))
+        (Result.Error e) (IO.errorln &e)))))

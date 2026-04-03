@@ -1,0 +1,36 @@
+(load "https://github.com/carpentry-org/lua@0.1.0")
+
+(Lua.setup "lua")
+
+; load configuration from a Lua file and use it from Carp
+(defn main []
+  (Lua.with-lua-do
+    (Lua.libs lua)
+
+    (match (Lua.eval-file lua "examples/config.lua")
+      (Result.Error e)
+        (IO.errorln &(fmt "failed to load config: %s" &e))
+      (Result.Success _)
+        (do
+          ; read config values
+          (Lua.get-global lua (cstr "app"))
+          (let [name (Luax.get-string-field lua -1 "name")
+                port (Luax.get-int-field lua -1 "port")
+                debug (Luax.get-bool-field lua -1 "debug")]
+            (do
+              (match name
+                (Maybe.Just n) (IO.println &(fmt "app:   %s" &n))
+                (Maybe.Nothing) (IO.errorln "missing app.name"))
+              (match port
+                (Maybe.Just p) (IO.println &(fmt "port:  %d" p))
+                (Maybe.Nothing) (IO.errorln "missing app.port"))
+              (match debug
+                (Maybe.Just d) (IO.println &(fmt "debug: %s" &(str d)))
+                (Maybe.Nothing) (IO.errorln "missing app.debug"))))
+          (Lua.pop lua 1)
+
+          ; call a function defined in the config file
+          (let [greeting (Luax.call-fn lua greeting Luax.get-carp-str)]
+            (match greeting
+              (Result.Success g) (IO.println &(fmt "greeting: %s" &g))
+              (Result.Error e) (IO.errorln &e)))))))

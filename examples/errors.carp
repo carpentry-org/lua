@@ -1,0 +1,48 @@
+(load "https://github.com/carpentry-org/lua@0.1.0")
+
+(Lua.setup "lua")
+
+; demonstrating error handling across the API
+(defn main []
+  (Lua.with-lua-do
+    (Lua.libs lua)
+
+    ; do-in wraps do-string with Result
+    (match (Luax.do-in lua "x = 1 + 1")
+      (Result.Success _) (IO.println "valid code: ok")
+      (Result.Error e) (IO.errorln &e))
+
+    (match (Luax.do-in lua "x = nil + 1")
+      (Result.Success _) (IO.println "should not reach here")
+      (Result.Error e) (IO.println &(fmt "caught: %s" &e)))
+
+    ; call-fn reports undefined functions
+    (match (Luax.call-fn lua no-such-function Lua.get-int)
+      (Result.Success _) (IO.println "should not reach here")
+      (Result.Error e) (IO.println &(fmt "caught: %s" &e)))
+
+    ; call-fn reports Lua errors
+    (ignore (Lua.do-string lua (cstr "function boom() error('kaboom!') end")))
+    (match (Luax.call-fn lua boom Lua.get-int)
+      (Result.Success _) (IO.println "should not reach here")
+      (Result.Error e) (IO.println &(fmt "caught: %s" &e)))
+
+    ; eval-file reports missing files
+    (match (Lua.eval-file lua "nonexistent.lua")
+      (Result.Success _) (IO.println "should not reach here")
+      (Result.Error e) (IO.println &(fmt "caught: %s" &e)))
+
+    ; safe getters return Nothing on type mismatch
+    (Lua.push-int lua 42)
+    (match (Luax.maybe-get-string lua -1)
+      (Maybe.Just _) (IO.println "should not reach here")
+      (Maybe.Nothing) (IO.println "type mismatch: got Nothing (expected)"))
+    (match (Luax.maybe-get-int lua -1)
+      (Maybe.Just n) (IO.println &(fmt "correct type: %d" n))
+      (Maybe.Nothing) (IO.println "should not reach here"))
+    (Lua.pop lua 1)
+
+    ; global-exists? checks without crashing
+    (Luax.set-int-global lua "present" 1)
+    (IO.println &(fmt "present exists: %s" &(str (Lua.global-exists? lua "present"))))
+    (IO.println &(fmt "absent exists: %s" &(str (Lua.global-exists? lua "absent"))))))

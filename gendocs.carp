@@ -1,0 +1,111 @@
+(load "lua.carp")
+
+(Project.config "title" "lua")
+(Project.config "docs-directory" "./docs/")
+(Project.config "docs-logo" "")
+(Project.config "docs-url" "https://github.com/carpentry-org/lua")
+(Project.config "docs-styling" "../style.css")
+(Project.config "docs-prelude" "is a Lua embedding library for Carp. It provides
+two modules: `Lua` wraps the Lua C API directly, and `Luax` builds a safer
+interface on top using `Maybe` and `Result` types.
+
+## Installation
+
+```
+(load \"https://github.com/carpentry-org/lua@0.1.0\")
+(Lua.setup \"lua\")
+; if your library is named differently (e.g. lua5.4):
+(Lua.setup \"lua\" \"lua5.4\")
+```
+
+## Getting started
+
+All work happens inside a `Lua.with-lua-do` block, which creates a Lua state
+bound to `lua` and closes it when the block exits. Call `Lua.libs` to load the
+Lua standard library.
+
+```
+(defn main []
+  (Lua.with-lua-do
+    (Lua.libs lua)
+    (ignore (Lua.do-string lua (cstr \"print('hello from lua')\")))))
+```
+
+The Lua C API is stack-based: you push values onto a virtual stack, run
+operations, and read results back using negative indices (-1 is the top).
+
+```
+(Lua.push-int lua 42)
+(Lua.push-float lua 3.14f)
+(let [f (Lua.get-float lua -1)   ; 3.14
+      i (Lua.get-int lua -2)]    ; 42
+  (Lua.pop lua 2))
+```
+
+## Calling Lua functions
+
+`Lua.fun` defines a Lua function from inline source. `Luax.call-fn` handles the
+full call cycle — looking up the function, pushing arguments, calling, and
+reading the result — and returns `Result` to catch undefined functions and
+runtime errors:
+
+```
+(ignore (Lua.fun lua add [x y] \"return x + y\"))
+(match (Luax.call-fn lua add Lua.get-int
+         (Lua.push-int 3) (Lua.push-int 4))
+  (Result.Success v) (IO.println &(fmt \"3 + 4 = %d\" v))
+  (Result.Error e) (IO.errorln &e))
+```
+
+## Working with tables
+
+`Luax.make-table` creates a table, sets fields, and assigns it to a global in
+one expression. Field values are given as push expressions:
+
+```
+(Luax.make-table lua player
+  (name (Lua.push-carp-str \"Ada\"))
+  (hp (Lua.push-int 100))
+  (x (Lua.push-float 3.5f)))
+```
+
+To read fields back, push the table and use `Luax.get-*-field`. These return
+`Maybe` and pop the field value internally, so you can read multiple fields in
+sequence without manual stack management:
+
+```
+(Lua.get-global lua (cstr \"player\"))
+(match (Luax.get-string-field lua -1 \"name\")
+  (Maybe.Just name) (IO.println &name)
+  (Maybe.Nothing) (IO.errorln \"no name\"))
+(match (Luax.get-int-field lua -1 \"hp\")
+  (Maybe.Just hp) (IO.println &(fmt \"hp: %d\" hp))
+  (Maybe.Nothing) (IO.errorln \"no hp\"))
+(Lua.pop lua 1)
+```
+
+## Loading Lua files
+
+Use `Lua.eval-file` to load and execute a Lua file with error handling:
+
+```
+(match (Lua.eval-file lua \"config.lua\")
+  (Result.Success _) (IO.println \"loaded\")
+  (Result.Error e) (IO.errorln &e))
+```
+
+## Safe globals
+
+`Luax.set-*-global` and `Luax.get-*-global` handle push/pop for you. The
+getters return `Maybe` and leave the stack clean:
+
+```
+(Luax.set-int-global lua \"score\" 100)
+(match (Luax.get-int-global lua \"score\")
+  (Maybe.Just n) (IO.println &(fmt \"score: %d\" n))
+  (Maybe.Nothing) (IO.errorln \"not found\"))
+```
+")
+
+(save-docs Lua Luax)
+(quit)
