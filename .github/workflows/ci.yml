@@ -24,6 +24,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y liblua5.4-dev
+          sudo mkdir -p /opt/homebrew/include /opt/homebrew/lib
+          sudo ln -sf /usr/include/lua5.4 /opt/homebrew/include/lua
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/liblua5.4.so /opt/homebrew/lib/liblua.so
 
       - name: Install Lua deps (macOS)
         if: runner.os == 'macOS'
