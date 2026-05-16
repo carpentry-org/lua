@@ -40,5 +40,38 @@ jobs:
           carp -x test/lua.carp
           carp -x test/midlevel.carp
 
+      - name: Install angler
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/carpentry-org/angler /tmp/angler
+          (cd /tmp/angler && carp -b main.carp)
+          sudo install -m 755 /tmp/angler/out/angler /usr/local/bin/
+
+      - name: Install carp-fmt
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/carpentry-org/carp-fmt /tmp/carp-fmt
+          (cd /tmp/carp-fmt && carp -b main.carp)
+          sudo install -m 755 /tmp/carp-fmt/out/carp-fmt /usr/local/bin/
+
+      - name: Lint
+        run: |
+          # `with-lua-do`'s macro body uses `(do %@body)` to splice variadic
+          # rest-args into `with-lua-as`'s single body slot; angler can't see
+          # past the splice and reports a false-positive lonely-do.
+          angler --disable lonely-do $(find . -name '*.carp' \
+            -not -path './out/*' \
+            -not -path './docs/*' \
+            -not -path './.carp-src/*' \
+            -not -path './examples/*')
+
+      - name: Format check
+        run: |
+          carp-fmt --check $(find . -name '*.carp' \
+            -not -path './out/*' \
+            -not -path './docs/*' \
+            -not -path './.carp-src/*' \
+            -not -path './examples/*')
+
       - name: Generate docs
         run: carp -x gendocs.carp

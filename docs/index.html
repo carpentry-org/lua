@@ -1,0 +1,109 @@
+<!DOCTYPE HTML>
+
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+        <link rel="stylesheet" href="../style.css">
+    </head>
+    <body>
+        <div class="content">
+            <a href="https://github.com/carpentry-org/lua">
+                <div class="logo">
+                    <img src="" alt="Logo">
+                    <div class="index">
+                        <ul>
+                            <li>
+                                <a href="Lua.html">
+                                    Lua
+                                </a>
+                            </li>
+                            <li>
+                                <a href="Luax.html">
+                                    Luax
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div>
+                    <h1>
+                        lua
+                    </h1>
+                    <p>is a Lua embedding library for Carp. It provides
+two modules: <code>Lua</code> wraps the Lua C API directly, and <code>Luax</code> builds a safer
+interface on top using <code>Maybe</code> and <code>Result</code> types.</p>
+<h2>Installation</h2>
+<pre><code>(load &quot;https://github.com/carpentry-org/lua@0.1.0&quot;)
+(Lua.setup &quot;lua&quot;)
+; if your library is named differently (e.g. lua5.4):
+(Lua.setup &quot;lua&quot; &quot;lua5.4&quot;)
+</code></pre>
+<h2>Getting started</h2>
+<p>All work happens inside a <code>Lua.with-lua-do</code> block, which creates a Lua state
+bound to <code>lua</code> and closes it when the block exits. Call <code>Lua.libs</code> to load the
+Lua standard library.</p>
+<pre><code>(defn main []
+  (Lua.with-lua-do
+    (Lua.libs lua)
+    (ignore (Lua.do-string lua (cstr &quot;print('hello from lua')&quot;)))))
+</code></pre>
+<p>The Lua C API is stack-based: you push values onto a virtual stack, run
+operations, and read results back using negative indices (-1 is the top).</p>
+<pre><code>(Lua.push-int lua 42)
+(Lua.push-float lua 3.14f)
+(let [f (Lua.get-float lua -1)   ; 3.14
+      i (Lua.get-int lua -2)]    ; 42
+  (Lua.pop lua 2))
+</code></pre>
+<h2>Calling Lua functions</h2>
+<p><code>Lua.fun</code> defines a Lua function from inline source. <code>Luax.call-fn</code> handles the
+full call cycle — looking up the function, pushing arguments, calling, and
+reading the result — and returns <code>Result</code> to catch undefined functions and
+runtime errors:</p>
+<pre><code>(ignore (Lua.fun lua add [x y] &quot;return x + y&quot;))
+(match (Luax.call-fn lua add Lua.get-int
+         (Lua.push-int 3) (Lua.push-int 4))
+  (Result.Success v) (IO.println &amp;(fmt &quot;3 + 4 = %d&quot; v))
+  (Result.Error e) (IO.errorln &amp;e))
+</code></pre>
+<h2>Working with tables</h2>
+<p><code>Luax.make-table</code> creates a table, sets fields, and assigns it to a global in
+one expression. Field values are given as push expressions:</p>
+<pre><code>(Luax.make-table lua player
+  (name (Lua.push-carp-str &quot;Ada&quot;))
+  (hp (Lua.push-int 100))
+  (x (Lua.push-float 3.5f)))
+</code></pre>
+<p>To read fields back, push the table and use <code>Luax.get-*-field</code>. These return
+<code>Maybe</code> and pop the field value internally, so you can read multiple fields in
+sequence without manual stack management:</p>
+<pre><code>(Lua.get-global lua (cstr &quot;player&quot;))
+(match (Luax.get-string-field lua -1 &quot;name&quot;)
+  (Maybe.Just name) (IO.println &amp;name)
+  (Maybe.Nothing) (IO.errorln &quot;no name&quot;))
+(match (Luax.get-int-field lua -1 &quot;hp&quot;)
+  (Maybe.Just hp) (IO.println &amp;(fmt &quot;hp: %d&quot; hp))
+  (Maybe.Nothing) (IO.errorln &quot;no hp&quot;))
+(Lua.pop lua 1)
+</code></pre>
+<h2>Loading Lua files</h2>
+<p>Use <code>Lua.eval-file</code> to load and execute a Lua file with error handling:</p>
+<pre><code>(match (Lua.eval-file lua &quot;config.lua&quot;)
+  (Result.Success _) (IO.println &quot;loaded&quot;)
+  (Result.Error e) (IO.errorln &amp;e))
+</code></pre>
+<h2>Safe globals</h2>
+<p><code>Luax.set-*-global</code> and <code>Luax.get-*-global</code> handle push/pop for you. The
+getters return <code>Maybe</code> and leave the stack clean:</p>
+<pre><code>(Luax.set-int-global lua &quot;score&quot; 100)
+(match (Luax.get-int-global lua &quot;score&quot;)
+  (Maybe.Just n) (IO.println &amp;(fmt &quot;score: %d&quot; n))
+  (Maybe.Nothing) (IO.errorln &quot;not found&quot;))
+</code></pre>
+
+                </div>
+            </a>
+        </div>
+    </body>
+</html>

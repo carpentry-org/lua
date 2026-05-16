@@ -1,7 +1,5 @@
 (defmodule String
-  (defn from-cstr-or [cs default]
-    (if (null? cs) default (from-cstr cs)))
-)
+  (defn from-cstr-or [cs default] (if (null? cs) default (from-cstr cs))))
 
 (register-type Lua "lua_State")
 
@@ -20,7 +18,9 @@
           push-expr (cadr spec)
           call (cons (car push-expr) (cons lua (cdr push-expr)))]
       (cons
-        `(do (ignore %call) (Lua.set-field %lua -2 (cstr %(Symbol.str field-name))))
+        `(do
+          (ignore %call)
+          (Lua.set-field %lua -2 (cstr %(Symbol.str field-name))))
         (luax--make-field-stmts lua (cdr field-specs))))))
 
 (defmodule Lua
@@ -32,7 +32,8 @@
   (register MEMORY_ERROR Int "LUA_ERRMEM")
   (doc HANDLER_ERROR "Status code returned when the error handler itself fails.")
   (register HANDLER_ERROR Int "LUA_ERRERR")
-  (doc GC_ERROR "Status code returned when the garbage collector metamethod fails.")
+  (doc GC_ERROR
+    "Status code returned when the garbage collector metamethod fails.")
   (register GC_ERROR Int "LUA_ERRGCMM")
 
   (doc setup "Set up Lua includes and linking. `location` is the include path
@@ -44,7 +45,9 @@ library name for linking (defaults to `\"lua\"`).")
         (system-include %(Dynamic.String.concat [location "/lua.h"]))
         (system-include %(Dynamic.String.concat [location "/lauxlib.h"]))
         (system-include %(Dynamic.String.concat [location "/lualib.h"]))
-        (add-cflag %(Dynamic.String.concat ["-l" (if (> (length cflag) 0) (car cflag) "lua")])))))
+        (add-cflag
+          %(Dynamic.String.concat
+            ["-l" (if (> (length cflag) 0) (car cflag) "lua")])))))
 
   (doc new "Create a new Lua state. Must be closed with [`close`](#close) when
 done, or use [`with-lua-do`](#with-lua-do) to manage the lifecycle
@@ -71,16 +74,19 @@ automatically.")
   (register push-float (Fn [&Lua Float] ()) "lua_pushnumber")
   (doc push-string "Push a C string onto the stack. For Carp strings, use
 [`push-carp-str`](#push-carp-str) instead.")
-  (deftemplate push-string (Fn [&Lua (Ptr CChar)] (Ptr CChar))
-    "char* $NAME(lua_State* l, const char* s)"
-    "$DECL { return (char*) lua_pushstring(l, s); }")
+  (deftemplate push-string
+               (Fn [&Lua (Ptr CChar)] (Ptr CChar))
+               "char* $NAME(lua_State* l, const char* s)"
+               "$DECL { return (char*) lua_pushstring(l, s); }")
   (doc push-thread "Push the current thread onto the stack.")
   (register push-thread (Fn [&Lua] ()) "lua_pushthread")
-  (doc push-copy "Push a copy of the element at `index` onto the top of the stack.")
+  (doc push-copy
+    "Push a copy of the element at `index` onto the top of the stack.")
   (register push-copy (Fn [&Lua Int] ()) "lua_pushvalue")
   (doc get-global "Push the value of the named global onto the stack.")
   (register get-global (Fn [&Lua (Ptr CChar)] ()) "lua_getglobal")
-  (doc set-global "Pop the top value from the stack and set it as the named global.")
+  (doc set-global
+    "Pop the top value from the stack and set it as the named global.")
   (register set-global (Fn [&Lua (Ptr CChar)] ()) "lua_setglobal")
   (doc get-top "Return the index of the top element, which equals the number of
 elements on the stack.")
@@ -102,7 +108,9 @@ raw pointer; prefer [`Luax.get-carp-str`](#get-carp-str) or
 
   (doc load-buffer "Load a Lua chunk from a buffer without executing it. Returns
 a status code.")
-  (register load-buffer (Fn [&Lua (Ptr CChar) Int (Ptr CChar)] Int) "luaL_loadbuffer")
+  (register load-buffer
+    (Fn [&Lua (Ptr CChar) Int (Ptr CChar)] Int)
+    "luaL_loadbuffer")
   (doc call "Call a function on the stack with `nargs` arguments and `nresults`
 expected results. The last argument is the error handler stack index (0 for
 none). Returns a status code; use [`Luax.call-fn`](#call-fn) for a safer
@@ -124,11 +132,13 @@ Use [`Luax.do-in`](#do-in) for a version that returns `Result`.")
   (register TYPE_TABLE Int "LUA_TTABLE")
   (doc TYPE_FUNCTION "Type constant for function values.")
   (register TYPE_FUNCTION Int "LUA_TFUNCTION")
-  (doc type-of "Return the type constant of the value at `index`. Compare against
+  (doc type-of
+    "Return the type constant of the value at `index`. Compare against
 `TYPE_NIL`, `TYPE_NUMBER`, etc.")
   (register type-of (Fn [&Lua Int] Int) "lua_type")
 
-  (doc create-table "Push a new empty table onto the stack. `narr` and `nrec` are
+  (doc create-table
+    "Push a new empty table onto the stack. `narr` and `nrec` are
 size hints for the array and hash parts.")
   (register create-table (Fn [&Lua Int Int] ()) "lua_createtable")
   (doc set-field "Pop the top value and set it as field `name` on the table at
@@ -139,7 +149,8 @@ and friends for a safer interface.")
   (doc get-field "Push the value of field `name` from the table at `index` onto
 the stack. Returns a type constant.")
   (register get-field (Fn [&Lua Int (Ptr CChar)] Int) "lua_getfield")
-  (doc set-table "Pop a key and value from the stack and set them on the table at
+  (doc set-table
+    "Pop a key and value from the stack and set them on the table at
 `index`. The value must be on top, with the key below it.")
   (register set-table (Fn [&Lua Int] ()) "lua_settable")
   (doc get-table "Pop a key from the stack and push the corresponding value from
@@ -152,15 +163,17 @@ with [`push-nil`](#push-nil) as the initial key.")
 
   (doc do-file "Load and execute a Lua file. Returns a status code. Use
 [`eval-file`](#eval-file) for a version that returns `Result`.")
-  (deftemplate do-file (Fn [&Lua (Ptr CChar)] Int)
-    "int $NAME(lua_State* l, const char* f)"
-    "$DECL { return luaL_dofile(l, f); }")
+  (deftemplate do-file
+               (Fn [&Lua (Ptr CChar)] Int)
+               "int $NAME(lua_State* l, const char* f)"
+               "$DECL { return luaL_dofile(l, f); }")
 
   (doc to-string "Read the value at `index` as a C string pointer. Low-level
 alias; prefer [`Luax.get-carp-str`](#get-carp-str).")
-  (deftemplate to-string (Fn [&Lua Int] (Ptr CChar))
-    "char* $NAME(Lua* l, int i)"
-    "$DECL { return (char*) lua_tostring(l, i); }")
+  (deftemplate to-string
+               (Fn [&Lua Int] (Ptr CChar))
+               "char* $NAME(Lua* l, int i)"
+               "$DECL { return (char*) lua_tostring(l, i); }")
 
   (doc with-lua-as "Create a Lua state bound to `name`, evaluate `body`, then
 close the state. Returns the result of `body`.
@@ -170,15 +183,12 @@ close the state. Returns the result of `body`.
   (do (Lua.libs L) (Lua.do-string L (cstr \"print('hi')\"))))
 ```")
   (defmacro with-lua-as [name body]
-    (let [s (gensym)]
-      `(let-do [%name (Lua.new)
-                %s %body]
-        (Lua.close %name)
-        %s)))
+    (let [s (gensym)] `(let-do [%name (Lua.new)
+                                %s %body] (Lua.close %name) %s)))
 
-  (doc with-lua "Like [`with-lua-as`](#with-lua-as) but binds the state to `lua`.")
-  (defmacro with-lua [body]
-    `(Lua.with-lua-as lua %body))
+  (doc with-lua
+    "Like [`with-lua-as`](#with-lua-as) but binds the state to `lua`.")
+  (defmacro with-lua [body] `(Lua.with-lua-as lua %body))
 
   (doc with-lua-do "Like [`with-lua`](#with-lua) but wraps multiple body forms
 in a `do` block. This is the most common entry point.
@@ -189,8 +199,7 @@ in a `do` block. This is the most common entry point.
   (Lua.push-int lua 42)
   (IO.println &(str (Lua.get-int lua -1))))
 ```")
-  (defmacro with-lua-do [:rest body]
-    `(Lua.with-lua-as lua (do %@body)))
+  (defmacro with-lua-do [:rest body] `(Lua.with-lua-as lua (do %@body)))
 
   (doc evaluate "Create a temporary Lua state, evaluate the expression `s`, and
 return its string representation as a `Result`. Useful for one-off evaluations
@@ -202,23 +211,20 @@ without managing a state manually.
   (Result.Error e) (IO.errorln &e))
 ```")
   (defn evaluate [s]
-    (Lua.with-lua-do
-      (libs lua)
-      (let [code (do-string lua (cstr &(fmt "return tostring(%s);" s)))
-               res (from-cstr-or (to-string lua -1) @"")]
-        ((if (/= OK code) Result.Error Result.Success) res))))
+    (Lua.with-lua-do (libs lua)
+                     (let [code (do-string lua
+                                           (cstr &(fmt "return tostring(%s);" s)))
+                           res (from-cstr-or (to-string lua -1) @"")]
+                       ((if (/= OK code) Result.Error Result.Success) res))))
 
   (doc push-carp-str "Push a Carp `String` reference onto the Lua stack. Wraps
 [`push-string`](#push-string) with automatic `cstr` conversion.")
-  (defn push-carp-str [lua s]
-    (ignore (push-string lua (cstr s))))
+  (defn push-carp-str [lua s] (ignore (push-string lua (cstr s))))
 
   (doc set-string-global "Push `s` and assign it to the global `name`. For other
 types, see [`Luax.set-int-global`](#set-int-global) and friends.")
   (defn set-string-global [lua name s]
-    (do
-      (push-carp-str lua s)
-      (set-global lua (cstr name))))
+    (do (push-carp-str lua s) (set-global lua (cstr name))))
 
   (doc get-string-global "Fetch the global `name` and return it as a Carp
 `String`. Returns an empty string if the global is nil or not a string. For a
@@ -233,12 +239,10 @@ Pushes and pops internally, leaving the stack unchanged.")
   (defn global-exists? [lua name]
     (do
       (get-global lua (cstr name))
-      (let [exists (/= (type-of lua -1) TYPE_NIL)]
-        (do
-          (pop lua 1)
-          exists))))
+      (let-do [exists (/= (type-of lua -1) TYPE_NIL)] (pop lua 1) exists)))
 
-  (doc eval-file "Load and execute the Lua file at `path`. Returns `(Success \"\")`
+  (doc eval-file
+    "Load and execute the Lua file at `path`. Returns `(Success \"\")`
 on success or `(Error msg)` with the Lua error message on failure.")
   (sig eval-file (Fn [&Lua &String] (Result String String)))
   (defn eval-file [lua path]
@@ -255,13 +259,11 @@ stack unchanged.")
       -1
       (do
         (push-nil lua)
-        (let [count 0]
-          (do
-            (while (/= 0 (next lua (- index 1)))
-              (do
-                (set! count (+ count 1))
-                (pop lua 1)))
-            count)))))
+        (let-do [count 0]
+          (while-do (/= 0 (next lua (- index 1)))
+            (set! count (+ count 1))
+            (pop lua 1))
+          count))))
 
   (doc val "Evaluate the Lua expression `value` and assign the result to the
 global `name`. Returns `OK` on success.
@@ -271,11 +273,7 @@ global `name`. Returns `OK` on success.
 ```")
   (defn val [lua name value]
     (let [res (Lua.do-string lua (cstr &(fmt "return %s" value)))]
-      (if (= res Lua.OK)
-        (do
-          (Lua.set-global lua (cstr name))
-          res)
-        res)))
+      (if (= res Lua.OK) (do (Lua.set-global lua (cstr name)) res) res)))
 
   (doc fun "Define a Lua function from a Carp macro call. `name` becomes a Lua
 global, `args` is a list of parameter names, and `body` is the Lua source.
@@ -284,16 +282,20 @@ global, `args` is a list of parameter names, and `body` is the Lua source.
 (Lua.fun lua add [x y] \"return x + y\")
 ```")
   (defmacro fun [lua name args body]
-    (list 'Lua.val lua (Symbol.str name)
-      (String.concat [
-        "function("
-        (if (empty? args)
-          ""
-          (Dynamic.reduce (fn [acc s] (String.concat [acc "," (Symbol.str s)])) (Symbol.str (car args)) (cdr args)))
-        ") "
-        body
-        " end"])))
-)
+    (list 'Lua.val
+          lua
+          (Symbol.str name)
+          (String.concat
+            ["function("
+             (if (empty? args)
+               ""
+               (Dynamic.reduce
+                 (fn [acc s] (String.concat [acc "," (Symbol.str s)]))
+                 (Symbol.str (car args))
+                 (cdr args)))
+             ") "
+             body
+             " end"]))))
 
 (doc Lua "provides bindings for embedding Lua in Carp. It wraps the Lua C API
 directly, following its stack-based model: you push values onto a virtual stack,
@@ -460,51 +462,48 @@ and assigns it to a global in one expression:
 
   (doc set-int-global "Push `value` and assign it to the global `name`.")
   (defn set-int-global [lua name value]
-    (do
-      (Lua.push-int lua value)
-      (Lua.set-global lua (cstr name))))
+    (do (Lua.push-int lua value) (Lua.set-global lua (cstr name))))
 
   (doc set-float-global "Push `value` and assign it to the global `name`.")
   (defn set-float-global [lua name value]
-    (do
-      (Lua.push-float lua value)
-      (Lua.set-global lua (cstr name))))
+    (do (Lua.push-float lua value) (Lua.set-global lua (cstr name))))
 
   (doc set-bool-global "Push `value` and assign it to the global `name`.")
   (defn set-bool-global [lua name value]
-    (do
-      (Lua.push-bool lua value)
-      (Lua.set-global lua (cstr name))))
+    (do (Lua.push-bool lua value) (Lua.set-global lua (cstr name))))
 
   (doc get-int-global "Fetch the global `name` as an integer. Returns `Nothing`
 if the global is nil or not a number. Pops the global from the stack internally.")
   (defn get-int-global [lua name]
     (do
       (Lua.get-global lua (cstr name))
-      (let [result (if (= (Lua.type-of lua -1) Lua.TYPE_NUMBER)
-                     (Maybe.Just (Lua.get-int lua -1))
-                     (Maybe.Nothing))]
-        (do (Lua.pop lua 1) result))))
+      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_NUMBER)
+                 (Maybe.Just (Lua.get-int lua -1))
+                 (Maybe.Nothing))]
+        (Lua.pop lua 1)
+        result)))
 
   (doc get-float-global "Fetch the global `name` as a float. Returns `Nothing`
 if the global is nil or not a number. Pops the global from the stack internally.")
   (defn get-float-global [lua name]
     (do
       (Lua.get-global lua (cstr name))
-      (let [result (if (= (Lua.type-of lua -1) Lua.TYPE_NUMBER)
-                     (Maybe.Just (Lua.get-float lua -1))
-                     (Maybe.Nothing))]
-        (do (Lua.pop lua 1) result))))
+      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_NUMBER)
+                 (Maybe.Just (Lua.get-float lua -1))
+                 (Maybe.Nothing))]
+        (Lua.pop lua 1)
+        result)))
 
   (doc get-bool-global "Fetch the global `name` as a boolean. Returns `Nothing`
 if the global is nil or not a boolean. Pops the global from the stack internally.")
   (defn get-bool-global [lua name]
     (do
       (Lua.get-global lua (cstr name))
-      (let [result (if (= (Lua.type-of lua -1) Lua.TYPE_BOOLEAN)
-                     (Maybe.Just (Lua.get-bool lua -1))
-                     (Maybe.Nothing))]
-        (do (Lua.pop lua 1) result))))
+      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_BOOLEAN)
+                 (Maybe.Just (Lua.get-bool lua -1))
+                 (Maybe.Nothing))]
+        (Lua.pop lua 1)
+        result)))
 
   (doc get-string-global "Fetch the global `name` as a Carp `String`. Returns
 `Nothing` if the global is nil or not a string. Pops the global from the stack
@@ -512,31 +511,26 @@ internally.")
   (defn get-string-global [lua name]
     (do
       (Lua.get-global lua (cstr name))
-      (let [result (if (= (Lua.type-of lua -1) Lua.TYPE_STRING)
-                     (Maybe.Just (String.from-cstr-or (Lua.to-string lua -1) @""))
-                     (Maybe.Nothing))]
-        (do (Lua.pop lua 1) result))))
+      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_STRING)
+                 (Maybe.Just (String.from-cstr-or (Lua.to-string lua -1) @""))
+                 (Maybe.Nothing))]
+        (Lua.pop lua 1)
+        result)))
 
   (doc set-int-field "Set field `name` to `value` on the table at `index`.
 Handles the stack index shift from pushing the value internally.")
   (defn set-int-field [lua index name value]
-    (do
-      (Lua.push-int lua value)
-      (Lua.set-field lua (- index 1) (cstr name))))
+    (do (Lua.push-int lua value) (Lua.set-field lua (- index 1) (cstr name))))
 
   (doc set-float-field "Set field `name` to `value` on the table at `index`.
 Handles the stack index shift from pushing the value internally.")
   (defn set-float-field [lua index name value]
-    (do
-      (Lua.push-float lua value)
-      (Lua.set-field lua (- index 1) (cstr name))))
+    (do (Lua.push-float lua value) (Lua.set-field lua (- index 1) (cstr name))))
 
   (doc set-bool-field "Set field `name` to `value` on the table at `index`.
 Handles the stack index shift from pushing the value internally.")
   (defn set-bool-field [lua index name value]
-    (do
-      (Lua.push-bool lua value)
-      (Lua.set-field lua (- index 1) (cstr name))))
+    (do (Lua.push-bool lua value) (Lua.set-field lua (- index 1) (cstr name))))
 
   (doc set-string-field "Set field `name` to the string `value` on the table at
 `index`. Handles the stack index shift from pushing the value internally.")
@@ -551,10 +545,11 @@ from the stack internally, leaving only the table.")
   (defn get-int-field [lua index name]
     (do
       (ignore (Lua.get-field lua index (cstr name)))
-      (let [result (if (= (Lua.type-of lua -1) Lua.TYPE_NUMBER)
-                     (Maybe.Just (Lua.get-int lua -1))
-                     (Maybe.Nothing))]
-        (do (Lua.pop lua 1) result))))
+      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_NUMBER)
+                 (Maybe.Just (Lua.get-int lua -1))
+                 (Maybe.Nothing))]
+        (Lua.pop lua 1)
+        result)))
 
   (doc get-float-field "Read field `name` from the table at `index` as a float.
 Returns `Nothing` if the field is nil or not a number. Pops the field value
@@ -562,10 +557,11 @@ from the stack internally, leaving only the table.")
   (defn get-float-field [lua index name]
     (do
       (ignore (Lua.get-field lua index (cstr name)))
-      (let [result (if (= (Lua.type-of lua -1) Lua.TYPE_NUMBER)
-                     (Maybe.Just (Lua.get-float lua -1))
-                     (Maybe.Nothing))]
-        (do (Lua.pop lua 1) result))))
+      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_NUMBER)
+                 (Maybe.Just (Lua.get-float lua -1))
+                 (Maybe.Nothing))]
+        (Lua.pop lua 1)
+        result)))
 
   (doc get-bool-field "Read field `name` from the table at `index` as a boolean.
 Returns `Nothing` if the field is nil or not a boolean. Pops the field value
@@ -573,10 +569,11 @@ from the stack internally, leaving only the table.")
   (defn get-bool-field [lua index name]
     (do
       (ignore (Lua.get-field lua index (cstr name)))
-      (let [result (if (= (Lua.type-of lua -1) Lua.TYPE_BOOLEAN)
-                     (Maybe.Just (Lua.get-bool lua -1))
-                     (Maybe.Nothing))]
-        (do (Lua.pop lua 1) result))))
+      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_BOOLEAN)
+                 (Maybe.Just (Lua.get-bool lua -1))
+                 (Maybe.Nothing))]
+        (Lua.pop lua 1)
+        result)))
 
   (doc get-string-field "Read field `name` from the table at `index` as a Carp
 `String`. Returns `Nothing` if the field is nil or not a string. Pops the field
@@ -584,12 +581,14 @@ value from the stack internally, leaving only the table.")
   (defn get-string-field [lua index name]
     (do
       (ignore (Lua.get-field lua index (cstr name)))
-      (let [result (if (= (Lua.type-of lua -1) Lua.TYPE_STRING)
-                     (Maybe.Just (String.from-cstr-or (Lua.to-string lua -1) @""))
-                     (Maybe.Nothing))]
-        (do (Lua.pop lua 1) result))))
+      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_STRING)
+                 (Maybe.Just (String.from-cstr-or (Lua.to-string lua -1) @""))
+                 (Maybe.Nothing))]
+        (Lua.pop lua 1)
+        result)))
 
-  (doc do-in "Compile and execute the Lua string `code`. Returns `(Success \"\")`
+  (doc do-in
+    "Compile and execute the Lua string `code`. Returns `(Success \"\")`
 on success or `(Error msg)` with the Lua error message on failure. Wraps
 [`Lua.do-string`](#do-string) with `Result` handling.")
   (sig do-in (Fn [&Lua &String] (Result String String)))
@@ -597,7 +596,8 @@ on success or `(Error msg)` with the Lua error message on failure. Wraps
     (let [res (Lua.do-string lua (cstr code))]
       (if (= res Lua.OK)
         (Result.Success @"")
-        (Result.Error (String.from-cstr-or (Lua.to-string lua -1) @"unknown error")))))
+        (Result.Error
+          (String.from-cstr-or (Lua.to-string lua -1) @"unknown error")))))
 
   (doc call-fn "Call the Lua function `name` and read the result with `getter`.
 Arguments are passed as push expressions—the `lua` state argument is inserted
@@ -613,19 +613,19 @@ call raises a Lua error.
     (let [nargs (length push-exprs)
           pushes (luax--make-push-calls lua push-exprs)
           result-sym (gensym)
-          error-str (Dynamic.String.concat ["undefined function: " (Symbol.str name)])]
+          error-str (Dynamic.String.concat
+            ["undefined function: " (Symbol.str name)])]
       `(do
         (Lua.get-global %lua (cstr %(Symbol.str name)))
         (if (= (Lua.type-of %lua -1) Lua.TYPE_NIL)
-          (do
-            (Lua.pop %lua 1)
-            (Result.Error @%error-str))
+          (do (Lua.pop %lua 1) (Result.Error @%error-str))
           (do
             %@pushes
             (let [%result-sym (Lua.call %lua %nargs 1 0)]
               (if (= %result-sym Lua.OK)
                 (Result.Success (%getter %lua -1))
-                (Result.Error (String.from-cstr-or (Lua.to-string %lua -1) @"unknown error")))))))))
+                (Result.Error
+                  (String.from-cstr-or (Lua.to-string %lua -1) @"unknown error")))))))))
 
   (doc make-table "Create a Lua table with the given fields and assign it to the
 global `name`. Each field spec is `(field-name (push-expr))`, where the `lua`
@@ -642,5 +642,4 @@ state argument is inserted into the push expression automatically.
       `(do
         (Lua.create-table %lua 0 %n)
         %@stmts
-        (Lua.set-global %lua (cstr %(Symbol.str name))))))
-)
+        (Lua.set-global %lua (cstr %(Symbol.str name)))))))

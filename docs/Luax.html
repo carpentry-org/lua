@@ -1,0 +1,599 @@
+<!DOCTYPE HTML>
+
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+        <link rel="stylesheet" href="../style.css">
+    </head>
+    <body>
+        <div class="content">
+            <div class="logo">
+                <a href="https://github.com/carpentry-org/lua">
+                    <img src="">
+                </a>
+                <div class="title">
+                    lua
+                </div>
+                <div class="index">
+                    <ul>
+                        <li>
+                            <a href="Lua.html">
+                                Lua
+                            </a>
+                        </li>
+                        <li>
+                            <a href="Luax.html">
+                                Luax
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="module">
+                <h1>
+                    Luax
+                </h1>
+                <div class="module-description">
+                    <p>provides a safe, higher-level interface over <a href="#Lua"><code>Lua</code></a>. Where the
+<code>Lua</code> module returns raw values and status codes, <code>Luax</code> returns <code>Maybe</code> and
+<code>Result</code> types, manages stack cleanup internally, and provides macros that
+reduce boilerplate for common patterns.</p>
+<p><strong>Safe stack access.</strong> The <code>maybe-get-*</code> family type-checks before reading and
+returns <code>Nothing</code> on mismatch, so you never get garbage from reading the wrong
+type:</p>
+<pre><code>(Lua.push-int lua 42)
+(match (Luax.maybe-get-int lua -1)
+  (Maybe.Just n) (IO.println &amp;(fmt &quot;got %d&quot; n))
+  (Maybe.Nothing) (IO.errorln &quot;not a number&quot;))
+(match (Luax.maybe-get-string lua -1)
+  (Maybe.Just _) ()  ; won't match — it's an int
+  (Maybe.Nothing) (IO.println &quot;correctly rejected&quot;))
+(Lua.pop lua 1)
+</code></pre>
+<p><strong>Globals.</strong> <code>set-*-global</code> and <code>get-*-global</code> handle the push/pop cycle for
+you. The getters return <code>Maybe</code> and clean up the stack regardless of success:</p>
+<pre><code>(Luax.set-int-global lua &quot;score&quot; 100)
+(Luax.set-bool-global lua &quot;debug&quot; true)
+(match (Luax.get-int-global lua &quot;score&quot;)
+  (Maybe.Just n) (IO.println &amp;(fmt &quot;score: %d&quot; n))
+  (Maybe.Nothing) (IO.errorln &quot;missing&quot;))
+</code></pre>
+<p><strong>Table fields.</strong> <code>get-*-field</code> reads a field from a table already on the stack
+and pops the field value afterward, so you can read multiple fields in sequence
+without manual stack management. <code>set-*-field</code> handles the index shift from
+pushing the value:</p>
+<pre><code>(Lua.get-global lua (cstr &quot;player&quot;))
+(match (Luax.get-string-field lua -1 &quot;name&quot;)
+  (Maybe.Just name) (IO.println &amp;name)
+  (Maybe.Nothing) (IO.errorln &quot;no name&quot;))
+(match (Luax.get-int-field lua -1 &quot;hp&quot;)
+  (Maybe.Just hp) (IO.println &amp;(fmt &quot;hp: %d&quot; hp))
+  (Maybe.Nothing) (IO.errorln &quot;no hp&quot;))
+(Luax.set-int-field lua -1 &quot;hp&quot; 0)
+(Lua.pop lua 1)
+</code></pre>
+<p><strong>Calling functions.</strong> <a href="#call-fn"><code>call-fn</code></a> looks up a global function, pushes
+arguments, calls it, and reads the result — returning <code>(Error msg)</code> if the
+function is undefined or raises a Lua error:</p>
+<pre><code>(match (Luax.call-fn lua add Lua.get-int
+         (Lua.push-int 3) (Lua.push-int 4))
+  (Result.Success v) (IO.println &amp;(fmt &quot;3 + 4 = %d&quot; v))
+  (Result.Error e) (IO.errorln &amp;e))
+</code></pre>
+<p><strong>Building tables.</strong> <a href="#make-table"><code>make-table</code></a> creates a table, sets fields,
+and assigns it to a global in one expression:</p>
+<pre><code>(Luax.make-table lua point
+  (x (Lua.push-int 10))
+  (y (Lua.push-int 20)))
+; point is now a Lua global with fields x=10, y=20
+</code></pre>
+<p><strong>Code execution.</strong> <a href="#do-in"><code>do-in</code></a> wraps <a href="#do-string"><code>Lua.do-string</code></a> with
+<code>Result</code> error handling:</p>
+<pre><code>(match (Luax.do-in lua &quot;x = 1 + nil&quot;)
+  (Result.Success _) ()
+  (Result.Error e) (IO.println &amp;(fmt &quot;caught: %s&quot; &amp;e)))
+</code></pre>
+
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#call-fn">
+                        <h3 id="call-fn">
+                            call-fn
+                        </h3>
+                    </a>
+                    <div class="description">
+                        macro
+                    </div>
+                    <p class="sig">
+                        Macro
+                    </p>
+                    <pre class="args">
+                        (call-fn lua name getter :rest push-exprs)
+                    </pre>
+                    <p class="doc">
+                        <p>Call the Lua function <code>name</code> and read the result with <code>getter</code>.
+Arguments are passed as push expressions—the <code>lua</code> state argument is inserted
+automatically. Returns <code>(Error msg)</code> if the function is undefined or if the
+call raises a Lua error.</p>
+<pre><code>(Luax.call-fn lua add Lua.get-int
+  (Lua.push-int 3)
+  (Lua.push-int 4))
+</code></pre>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#do-in">
+                        <h3 id="do-in">
+                            do-in
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), (Ref String b)] (Result String String))
+                    </p>
+                    <pre class="args">
+                        (do-in lua code)
+                    </pre>
+                    <p class="doc">
+                        <p>Compile and execute the Lua string <code>code</code>. Returns <code>(Success &quot;&quot;)</code>
+on success or <code>(Error msg)</code> with the Lua error message on failure. Wraps
+<a href="#do-string"><code>Lua.do-string</code></a> with <code>Result</code> handling.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#get-bool-field">
+                        <h3 id="get-bool-field">
+                            get-bool-field
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int, (Ref String b)] (Maybe Bool))
+                    </p>
+                    <pre class="args">
+                        (get-bool-field lua index name)
+                    </pre>
+                    <p class="doc">
+                        <p>Read field <code>name</code> from the table at <code>index</code> as a boolean.
+Returns <code>Nothing</code> if the field is nil or not a boolean. Pops the field value
+from the stack internally, leaving only the table.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#get-bool-global">
+                        <h3 id="get-bool-global">
+                            get-bool-global
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), (Ref String b)] (Maybe Bool))
+                    </p>
+                    <pre class="args">
+                        (get-bool-global lua name)
+                    </pre>
+                    <p class="doc">
+                        <p>Fetch the global <code>name</code> as a boolean. Returns <code>Nothing</code>
+if the global is nil or not a boolean. Pops the global from the stack internally.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#get-carp-str">
+                        <h3 id="get-carp-str">
+                            get-carp-str
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int] String)
+                    </p>
+                    <pre class="args">
+                        (get-carp-str lua index)
+                    </pre>
+                    <p class="doc">
+                        <p>Read the value at <code>index</code> as a Carp <code>String</code>, using Lua's
+<code>tostring</code> coercion. Returns an empty string if the conversion fails.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#get-float-field">
+                        <h3 id="get-float-field">
+                            get-float-field
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int, (Ref String b)] (Maybe Float))
+                    </p>
+                    <pre class="args">
+                        (get-float-field lua index name)
+                    </pre>
+                    <p class="doc">
+                        <p>Read field <code>name</code> from the table at <code>index</code> as a float.
+Returns <code>Nothing</code> if the field is nil or not a number. Pops the field value
+from the stack internally, leaving only the table.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#get-float-global">
+                        <h3 id="get-float-global">
+                            get-float-global
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), (Ref String b)] (Maybe Float))
+                    </p>
+                    <pre class="args">
+                        (get-float-global lua name)
+                    </pre>
+                    <p class="doc">
+                        <p>Fetch the global <code>name</code> as a float. Returns <code>Nothing</code>
+if the global is nil or not a number. Pops the global from the stack internally.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#get-int-field">
+                        <h3 id="get-int-field">
+                            get-int-field
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int, (Ref String b)] (Maybe Int))
+                    </p>
+                    <pre class="args">
+                        (get-int-field lua index name)
+                    </pre>
+                    <p class="doc">
+                        <p>Read field <code>name</code> from the table at <code>index</code> as an integer.
+Returns <code>Nothing</code> if the field is nil or not a number. Pops the field value
+from the stack internally, leaving only the table.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#get-int-global">
+                        <h3 id="get-int-global">
+                            get-int-global
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), (Ref String b)] (Maybe Int))
+                    </p>
+                    <pre class="args">
+                        (get-int-global lua name)
+                    </pre>
+                    <p class="doc">
+                        <p>Fetch the global <code>name</code> as an integer. Returns <code>Nothing</code>
+if the global is nil or not a number. Pops the global from the stack internally.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#get-string-field">
+                        <h3 id="get-string-field">
+                            get-string-field
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int, (Ref String b)] (Maybe String))
+                    </p>
+                    <pre class="args">
+                        (get-string-field lua index name)
+                    </pre>
+                    <p class="doc">
+                        <p>Read field <code>name</code> from the table at <code>index</code> as a Carp
+<code>String</code>. Returns <code>Nothing</code> if the field is nil or not a string. Pops the field
+value from the stack internally, leaving only the table.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#get-string-global">
+                        <h3 id="get-string-global">
+                            get-string-global
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), (Ref String b)] (Maybe String))
+                    </p>
+                    <pre class="args">
+                        (get-string-global lua name)
+                    </pre>
+                    <p class="doc">
+                        <p>Fetch the global <code>name</code> as a Carp <code>String</code>. Returns
+<code>Nothing</code> if the global is nil or not a string. Pops the global from the stack
+internally.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#make-table">
+                        <h3 id="make-table">
+                            make-table
+                        </h3>
+                    </a>
+                    <div class="description">
+                        macro
+                    </div>
+                    <p class="sig">
+                        Macro
+                    </p>
+                    <pre class="args">
+                        (make-table lua name :rest field-specs)
+                    </pre>
+                    <p class="doc">
+                        <p>Create a Lua table with the given fields and assign it to the
+global <code>name</code>. Each field spec is <code>(field-name (push-expr))</code>, where the <code>lua</code>
+state argument is inserted into the push expression automatically.</p>
+<pre><code>(Luax.make-table lua player
+  (name (Lua.push-carp-str &quot;Ada&quot;))
+  (hp (Lua.push-int 100)))
+</code></pre>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#maybe-get-bool">
+                        <h3 id="maybe-get-bool">
+                            maybe-get-bool
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int] (Maybe Bool))
+                    </p>
+                    <pre class="args">
+                        (maybe-get-bool lua index)
+                    </pre>
+                    <p class="doc">
+                        <p>Read the value at <code>index</code> as a boolean, returning
+<code>Nothing</code> if it is not a boolean. Leaves the stack unchanged.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#maybe-get-float">
+                        <h3 id="maybe-get-float">
+                            maybe-get-float
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int] (Maybe Float))
+                    </p>
+                    <pre class="args">
+                        (maybe-get-float lua index)
+                    </pre>
+                    <p class="doc">
+                        <p>Read the value at <code>index</code> as a float, returning
+<code>Nothing</code> if it is not a number. Leaves the stack unchanged.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#maybe-get-int">
+                        <h3 id="maybe-get-int">
+                            maybe-get-int
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int] (Maybe Int))
+                    </p>
+                    <pre class="args">
+                        (maybe-get-int lua index)
+                    </pre>
+                    <p class="doc">
+                        <p>Read the value at <code>index</code> as an integer, returning
+<code>Nothing</code> if it is not a number. Leaves the stack unchanged.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#maybe-get-string">
+                        <h3 id="maybe-get-string">
+                            maybe-get-string
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int] (Maybe String))
+                    </p>
+                    <pre class="args">
+                        (maybe-get-string lua index)
+                    </pre>
+                    <p class="doc">
+                        <p>Read the value at <code>index</code> as a Carp <code>String</code>, returning
+<code>Nothing</code> if it is not a string. Leaves the stack unchanged.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#set-bool-field">
+                        <h3 id="set-bool-field">
+                            set-bool-field
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int, (Ref String b), Bool] ())
+                    </p>
+                    <pre class="args">
+                        (set-bool-field lua index name value)
+                    </pre>
+                    <p class="doc">
+                        <p>Set field <code>name</code> to <code>value</code> on the table at <code>index</code>.
+Handles the stack index shift from pushing the value internally.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#set-bool-global">
+                        <h3 id="set-bool-global">
+                            set-bool-global
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), (Ref String b), Bool] ())
+                    </p>
+                    <pre class="args">
+                        (set-bool-global lua name value)
+                    </pre>
+                    <p class="doc">
+                        <p>Push <code>value</code> and assign it to the global <code>name</code>.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#set-float-field">
+                        <h3 id="set-float-field">
+                            set-float-field
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int, (Ref String b), Float] ())
+                    </p>
+                    <pre class="args">
+                        (set-float-field lua index name value)
+                    </pre>
+                    <p class="doc">
+                        <p>Set field <code>name</code> to <code>value</code> on the table at <code>index</code>.
+Handles the stack index shift from pushing the value internally.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#set-float-global">
+                        <h3 id="set-float-global">
+                            set-float-global
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), (Ref String b), Float] ())
+                    </p>
+                    <pre class="args">
+                        (set-float-global lua name value)
+                    </pre>
+                    <p class="doc">
+                        <p>Push <code>value</code> and assign it to the global <code>name</code>.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#set-int-field">
+                        <h3 id="set-int-field">
+                            set-int-field
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int, (Ref String b), Int] ())
+                    </p>
+                    <pre class="args">
+                        (set-int-field lua index name value)
+                    </pre>
+                    <p class="doc">
+                        <p>Set field <code>name</code> to <code>value</code> on the table at <code>index</code>.
+Handles the stack index shift from pushing the value internally.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#set-int-global">
+                        <h3 id="set-int-global">
+                            set-int-global
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), (Ref String b), Int] ())
+                    </p>
+                    <pre class="args">
+                        (set-int-global lua name value)
+                    </pre>
+                    <p class="doc">
+                        <p>Push <code>value</code> and assign it to the global <code>name</code>.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#set-string-field">
+                        <h3 id="set-string-field">
+                            set-string-field
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int, (Ref String b), (Ref String c)] ())
+                    </p>
+                    <pre class="args">
+                        (set-string-field lua index name value)
+                    </pre>
+                    <p class="doc">
+                        <p>Set field <code>name</code> to the string <code>value</code> on the table at
+<code>index</code>. Handles the stack index shift from pushing the value internally.</p>
+
+                    </p>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
