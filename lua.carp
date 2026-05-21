@@ -23,6 +23,79 @@
           (Lua.set-field %lua -2 (cstr %(Symbol.str field-name))))
         (luax--make-field-stmts lua (cdr field-specs))))))
 
+(defmacro luax--def-maybe-get [suffix type-const getter article type-article]
+  (let [fn-name (Symbol.concat ['maybe-get- suffix])
+        doc-str (Dynamic.String.concat
+          ["Read the value at `index` as "
+           article
+           ", returning `Nothing` if it is not "
+           type-article
+           ". Leaves the stack unchanged."])]
+    (eval
+      `(do
+        (doc %fn-name %doc-str)
+        (defn %fn-name [lua index]
+          (if (= (Lua.type-of lua index) %type-const)
+            (Maybe.Just (%getter lua index))
+            (Maybe.Nothing)))))))
+
+(defmacro luax--def-set-global [suffix pusher]
+  (let [fn-name (Symbol.concat ['set- suffix '-global])]
+    (eval
+      `(do
+        (doc %fn-name "Push `value` and assign it to the global `name`.")
+        (defn %fn-name [lua name value]
+          (do (%pusher lua value) (Lua.set-global lua (cstr name))))))))
+
+(defmacro luax--def-get-global [suffix type-const getter article type-article]
+  (let [fn-name (Symbol.concat ['get- suffix '-global])
+        doc-str (Dynamic.String.concat
+          ["Fetch the global `name` as "
+           article
+           ". Returns `Nothing` if the global is nil or not "
+           type-article
+           ". Pops the global from the stack internally."])]
+    (eval
+      `(do
+        (doc %fn-name %doc-str)
+        (defn %fn-name [lua name]
+          (do
+            (Lua.get-global lua (cstr name))
+            (let-do [result (if (= (Lua.type-of lua -1) %type-const)
+                       (Maybe.Just (%getter lua -1))
+                       (Maybe.Nothing))]
+              (Lua.pop lua 1)
+              result)))))))
+
+(defmacro luax--def-set-field [suffix pusher]
+  (let [fn-name (Symbol.concat ['set- suffix '-field])]
+    (eval
+      `(do
+        (doc %fn-name
+          "Set field `name` to `value` on the table at `index`. Handles the stack index shift from pushing the value internally.")
+        (defn %fn-name [lua index name value]
+          (do (%pusher lua value) (Lua.set-field lua (- index 1) (cstr name))))))))
+
+(defmacro luax--def-get-field [suffix type-const getter article type-article]
+  (let [fn-name (Symbol.concat ['get- suffix '-field])
+        doc-str (Dynamic.String.concat
+          ["Read field `name` from the table at `index` as "
+           article
+           ". Returns `Nothing` if the field is nil or not "
+           type-article
+           ". Pops the field value from the stack internally, leaving only the table."])]
+    (eval
+      `(do
+        (doc %fn-name %doc-str)
+        (defn %fn-name [lua index name]
+          (do
+            (ignore (Lua.get-field lua index (cstr name)))
+            (let-do [result (if (= (Lua.type-of lua -1) %type-const)
+                       (Maybe.Just (%getter lua -1))
+                       (Maybe.Nothing))]
+              (Lua.pop lua 1)
+              result)))))))
+
 (defmodule Lua
   (doc OK "Status code returned on success.")
   (register OK Int "LUA_OK")
@@ -427,165 +500,63 @@ and assigns it to a global in one expression:
 ```")
 
 (defmodule Luax
-  (doc maybe-get-int "Read the value at `index` as an integer, returning
-`Nothing` if it is not a number. Leaves the stack unchanged.")
-  (defn maybe-get-int [lua index]
-    (if (= (Lua.type-of lua index) Lua.TYPE_NUMBER)
-      (Maybe.Just (Lua.get-int lua index))
-      (Maybe.Nothing)))
-
-  (doc maybe-get-float "Read the value at `index` as a float, returning
-`Nothing` if it is not a number. Leaves the stack unchanged.")
-  (defn maybe-get-float [lua index]
-    (if (= (Lua.type-of lua index) Lua.TYPE_NUMBER)
-      (Maybe.Just (Lua.get-float lua index))
-      (Maybe.Nothing)))
-
-  (doc maybe-get-bool "Read the value at `index` as a boolean, returning
-`Nothing` if it is not a boolean. Leaves the stack unchanged.")
-  (defn maybe-get-bool [lua index]
-    (if (= (Lua.type-of lua index) Lua.TYPE_BOOLEAN)
-      (Maybe.Just (Lua.get-bool lua index))
-      (Maybe.Nothing)))
-
-  (doc maybe-get-string "Read the value at `index` as a Carp `String`, returning
-`Nothing` if it is not a string. Leaves the stack unchanged.")
-  (defn maybe-get-string [lua index]
-    (if (= (Lua.type-of lua index) Lua.TYPE_STRING)
-      (Maybe.Just (String.from-cstr-or (Lua.to-string lua index) @""))
-      (Maybe.Nothing)))
-
   (doc get-carp-str "Read the value at `index` as a Carp `String`, using Lua's
 `tostring` coercion. Returns an empty string if the conversion fails.")
   (defn get-carp-str [lua index]
     (String.from-cstr-or (Lua.to-string lua index) @""))
 
-  (doc set-int-global "Push `value` and assign it to the global `name`.")
-  (defn set-int-global [lua name value]
-    (do (Lua.push-int lua value) (Lua.set-global lua (cstr name))))
+  ; === maybe-get-* family ===
+  (luax--def-maybe-get int Lua.TYPE_NUMBER Lua.get-int "an integer" "a number")
+  (luax--def-maybe-get float Lua.TYPE_NUMBER Lua.get-float "a float" "a number")
+  (luax--def-maybe-get bool
+                       Lua.TYPE_BOOLEAN
+                       Lua.get-bool
+                       "a boolean"
+                       "a boolean")
+  (luax--def-maybe-get string
+                       Lua.TYPE_STRING
+                       get-carp-str
+                       "a Carp `String`"
+                       "a string")
 
-  (doc set-float-global "Push `value` and assign it to the global `name`.")
-  (defn set-float-global [lua name value]
-    (do (Lua.push-float lua value) (Lua.set-global lua (cstr name))))
+  ; === set-*-global family ===
+  (luax--def-set-global int Lua.push-int)
+  (luax--def-set-global float Lua.push-float)
+  (luax--def-set-global bool Lua.push-bool)
 
-  (doc set-bool-global "Push `value` and assign it to the global `name`.")
-  (defn set-bool-global [lua name value]
-    (do (Lua.push-bool lua value) (Lua.set-global lua (cstr name))))
+  ; === get-*-global family ===
+  (luax--def-get-global int Lua.TYPE_NUMBER Lua.get-int "an integer" "a number")
+  (luax--def-get-global float Lua.TYPE_NUMBER Lua.get-float "a float" "a number")
+  (luax--def-get-global bool
+                        Lua.TYPE_BOOLEAN
+                        Lua.get-bool
+                        "a boolean"
+                        "a boolean")
+  (luax--def-get-global string
+                        Lua.TYPE_STRING
+                        get-carp-str
+                        "a Carp `String`"
+                        "a string")
 
-  (doc get-int-global "Fetch the global `name` as an integer. Returns `Nothing`
-if the global is nil or not a number. Pops the global from the stack internally.")
-  (defn get-int-global [lua name]
-    (do
-      (Lua.get-global lua (cstr name))
-      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_NUMBER)
-                 (Maybe.Just (Lua.get-int lua -1))
-                 (Maybe.Nothing))]
-        (Lua.pop lua 1)
-        result)))
+  ; === set-*-field family ===
+  (luax--def-set-field int Lua.push-int)
+  (luax--def-set-field float Lua.push-float)
+  (luax--def-set-field bool Lua.push-bool)
+  (luax--def-set-field string Lua.push-carp-str)
 
-  (doc get-float-global "Fetch the global `name` as a float. Returns `Nothing`
-if the global is nil or not a number. Pops the global from the stack internally.")
-  (defn get-float-global [lua name]
-    (do
-      (Lua.get-global lua (cstr name))
-      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_NUMBER)
-                 (Maybe.Just (Lua.get-float lua -1))
-                 (Maybe.Nothing))]
-        (Lua.pop lua 1)
-        result)))
-
-  (doc get-bool-global "Fetch the global `name` as a boolean. Returns `Nothing`
-if the global is nil or not a boolean. Pops the global from the stack internally.")
-  (defn get-bool-global [lua name]
-    (do
-      (Lua.get-global lua (cstr name))
-      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_BOOLEAN)
-                 (Maybe.Just (Lua.get-bool lua -1))
-                 (Maybe.Nothing))]
-        (Lua.pop lua 1)
-        result)))
-
-  (doc get-string-global "Fetch the global `name` as a Carp `String`. Returns
-`Nothing` if the global is nil or not a string. Pops the global from the stack
-internally.")
-  (defn get-string-global [lua name]
-    (do
-      (Lua.get-global lua (cstr name))
-      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_STRING)
-                 (Maybe.Just (String.from-cstr-or (Lua.to-string lua -1) @""))
-                 (Maybe.Nothing))]
-        (Lua.pop lua 1)
-        result)))
-
-  (doc set-int-field "Set field `name` to `value` on the table at `index`.
-Handles the stack index shift from pushing the value internally.")
-  (defn set-int-field [lua index name value]
-    (do (Lua.push-int lua value) (Lua.set-field lua (- index 1) (cstr name))))
-
-  (doc set-float-field "Set field `name` to `value` on the table at `index`.
-Handles the stack index shift from pushing the value internally.")
-  (defn set-float-field [lua index name value]
-    (do (Lua.push-float lua value) (Lua.set-field lua (- index 1) (cstr name))))
-
-  (doc set-bool-field "Set field `name` to `value` on the table at `index`.
-Handles the stack index shift from pushing the value internally.")
-  (defn set-bool-field [lua index name value]
-    (do (Lua.push-bool lua value) (Lua.set-field lua (- index 1) (cstr name))))
-
-  (doc set-string-field "Set field `name` to the string `value` on the table at
-`index`. Handles the stack index shift from pushing the value internally.")
-  (defn set-string-field [lua index name value]
-    (do
-      (Lua.push-carp-str lua value)
-      (Lua.set-field lua (- index 1) (cstr name))))
-
-  (doc get-int-field "Read field `name` from the table at `index` as an integer.
-Returns `Nothing` if the field is nil or not a number. Pops the field value
-from the stack internally, leaving only the table.")
-  (defn get-int-field [lua index name]
-    (do
-      (ignore (Lua.get-field lua index (cstr name)))
-      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_NUMBER)
-                 (Maybe.Just (Lua.get-int lua -1))
-                 (Maybe.Nothing))]
-        (Lua.pop lua 1)
-        result)))
-
-  (doc get-float-field "Read field `name` from the table at `index` as a float.
-Returns `Nothing` if the field is nil or not a number. Pops the field value
-from the stack internally, leaving only the table.")
-  (defn get-float-field [lua index name]
-    (do
-      (ignore (Lua.get-field lua index (cstr name)))
-      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_NUMBER)
-                 (Maybe.Just (Lua.get-float lua -1))
-                 (Maybe.Nothing))]
-        (Lua.pop lua 1)
-        result)))
-
-  (doc get-bool-field "Read field `name` from the table at `index` as a boolean.
-Returns `Nothing` if the field is nil or not a boolean. Pops the field value
-from the stack internally, leaving only the table.")
-  (defn get-bool-field [lua index name]
-    (do
-      (ignore (Lua.get-field lua index (cstr name)))
-      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_BOOLEAN)
-                 (Maybe.Just (Lua.get-bool lua -1))
-                 (Maybe.Nothing))]
-        (Lua.pop lua 1)
-        result)))
-
-  (doc get-string-field "Read field `name` from the table at `index` as a Carp
-`String`. Returns `Nothing` if the field is nil or not a string. Pops the field
-value from the stack internally, leaving only the table.")
-  (defn get-string-field [lua index name]
-    (do
-      (ignore (Lua.get-field lua index (cstr name)))
-      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_STRING)
-                 (Maybe.Just (String.from-cstr-or (Lua.to-string lua -1) @""))
-                 (Maybe.Nothing))]
-        (Lua.pop lua 1)
-        result)))
+  ; === get-*-field family ===
+  (luax--def-get-field int Lua.TYPE_NUMBER Lua.get-int "an integer" "a number")
+  (luax--def-get-field float Lua.TYPE_NUMBER Lua.get-float "a float" "a number")
+  (luax--def-get-field bool
+                       Lua.TYPE_BOOLEAN
+                       Lua.get-bool
+                       "a boolean"
+                       "a boolean")
+  (luax--def-get-field string
+                       Lua.TYPE_STRING
+                       get-carp-str
+                       "a Carp `String`"
+                       "a string")
 
   (doc do-in
     "Compile and execute the Lua string `code`. Returns `(Success \"\")`
