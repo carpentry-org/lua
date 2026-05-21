@@ -23,7 +23,7 @@
           (Lua.set-field %lua -2 (cstr %(Symbol.str field-name))))
         (luax--make-field-stmts lua (cdr field-specs))))))
 
-(defndynamic luax--def-maybe-get [suffix type-const getter article type-article]
+(defmacro luax--def-maybe-get [suffix type-const getter article type-article]
   (let [fn-name (Symbol.concat ['maybe-get- suffix])
         doc-str (Dynamic.String.concat
                   ["Read the value at `index` as " article
@@ -37,7 +37,7 @@
             (Maybe.Just (%getter lua index))
             (Maybe.Nothing)))))))
 
-(defndynamic luax--def-set-global [suffix pusher]
+(defmacro luax--def-set-global [suffix pusher]
   (let [fn-name (Symbol.concat ['set- suffix '-global])]
     (eval
       `(do
@@ -45,7 +45,7 @@
         (defn %fn-name [lua name value]
           (do (%pusher lua value) (Lua.set-global lua (cstr name))))))))
 
-(defndynamic luax--def-get-global [suffix type-const getter article type-article]
+(defmacro luax--def-get-global [suffix type-const getter article type-article]
   (let [fn-name (Symbol.concat ['get- suffix '-global])
         doc-str (Dynamic.String.concat
                   ["Fetch the global `name` as " article
@@ -63,7 +63,7 @@
               (Lua.pop lua 1)
               result)))))))
 
-(defndynamic luax--def-set-field [suffix pusher]
+(defmacro luax--def-set-field [suffix pusher]
   (let [fn-name (Symbol.concat ['set- suffix '-field])]
     (eval
       `(do
@@ -74,7 +74,7 @@
             (%pusher lua value)
             (Lua.set-field lua (- index 1) (cstr name))))))))
 
-(defndynamic luax--def-get-field [suffix type-const getter article type-article]
+(defmacro luax--def-get-field [suffix type-const getter article type-article]
   (let [fn-name (Symbol.concat ['get- suffix '-field])
         doc-str (Dynamic.String.concat
                   ["Read field `name` from the table at `index` as " article
