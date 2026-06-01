@@ -523,6 +523,7 @@ and assigns it to a global in one expression:
   (luax--def-set-global int Lua.push-int)
   (luax--def-set-global float Lua.push-float)
   (luax--def-set-global bool Lua.push-bool)
+  (luax--def-set-global string Lua.push-carp-str)
 
   ; === get-*-global family ===
   (luax--def-get-global int Lua.TYPE_NUMBER Lua.get-int "an integer" "a number")

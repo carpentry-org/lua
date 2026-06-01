@@ -215,6 +215,23 @@
                      (Lua.get-bool lua -1))
     "set-bool-global sets a boolean global")
 
+  ; === set-string-global ===
+  (assert-true test
+    (= @"hello"
+       (Lua.with-lua-do (Lua.libs lua)
+                        (Luax.set-string-global lua "s" "hello")
+                        (Lua.get-global lua (cstr "s"))
+                        (String.from-cstr-or (Lua.to-string lua -1) @"")))
+    "set-string-global sets a string global")
+  (assert-true test
+    (= @"world"
+       (Lua.with-lua-do (Lua.libs lua)
+                        (Luax.set-string-global lua "greeting" "world")
+                        (ignore (Lua.do-string lua (cstr "result = greeting")))
+                        (Lua.get-global lua (cstr "result"))
+                        (String.from-cstr-or (Lua.to-string lua -1) @"")))
+    "string globals set from Carp are usable in Lua expressions")
+
   ; === get-int-global ===
   (assert-true test
     (= &(Maybe.Just 42)
@@ -229,7 +246,7 @@
   (assert-true test
     (Maybe.nothing?
       &(Lua.with-lua-do (Lua.libs lua)
-                        (Lua.set-string-global lua "s" "hello")
+                        (Luax.set-string-global lua "s" "hello")
                         (Luax.get-int-global lua "s")))
     "get-int-global returns Nothing for wrong type")
 
@@ -259,7 +276,7 @@
   (assert-true test
     (= &(Maybe.Just @"hello")
        &(Lua.with-lua-do (Lua.libs lua)
-                         (Lua.set-string-global lua "s" "hello")
+                         (Luax.set-string-global lua "s" "hello")
                          (Luax.get-string-global lua "s")))
     "get-string-global returns Just for existing string")
   (assert-true test
