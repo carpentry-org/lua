@@ -12,7 +12,7 @@ interface on top using `Maybe` and `Result` types.
 ## Installation
 
 ```
-(load \"https://github.com/carpentry-org/lua@0.1.0\")
+(load \"https://github.com/carpentry-org/lua@0.2.0\")
 (Lua.setup \"lua\")
 ; if your library is named differently (e.g. lua5.4):
 (Lua.setup \"lua\" \"lua5.4\")

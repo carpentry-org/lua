@@ -161,9 +161,7 @@ on success or <code>(Error msg)</code> with the Lua error message on failure. Wr
                         (get-bool-field lua index name)
                     </pre>
                     <p class="doc">
-                        <p>Read field <code>name</code> from the table at <code>index</code> as a boolean.
-Returns <code>Nothing</code> if the field is nil or not a boolean. Pops the field value
-from the stack internally, leaving only the table.</p>
+                        <p>Read field <code>name</code> from the table at <code>index</code> as a boolean. Returns <code>Nothing</code> if the field is nil or not a boolean. Pops the field value from the stack internally, leaving only the table.</p>
 
                     </p>
                 </div>
@@ -183,8 +181,7 @@ from the stack internally, leaving only the table.</p>
                         (get-bool-global lua name)
                     </pre>
                     <p class="doc">
-                        <p>Fetch the global <code>name</code> as a boolean. Returns <code>Nothing</code>
-if the global is nil or not a boolean. Pops the global from the stack internally.</p>
+                        <p>Fetch the global <code>name</code> as a boolean. Returns <code>Nothing</code> if the global is nil or not a boolean. Pops the global from the stack internally.</p>
 
                     </p>
                 </div>
@@ -225,9 +222,7 @@ if the global is nil or not a boolean. Pops the global from the stack internally
                         (get-float-field lua index name)
                     </pre>
                     <p class="doc">
-                        <p>Read field <code>name</code> from the table at <code>index</code> as a float.
-Returns <code>Nothing</code> if the field is nil or not a number. Pops the field value
-from the stack internally, leaving only the table.</p>
+                        <p>Read field <code>name</code> from the table at <code>index</code> as a float. Returns <code>Nothing</code> if the field is nil or not a number. Pops the field value from the stack internally, leaving only the table.</p>
 
                     </p>
                 </div>
@@ -247,8 +242,7 @@ from the stack internally, leaving only the table.</p>
                         (get-float-global lua name)
                     </pre>
                     <p class="doc">
-                        <p>Fetch the global <code>name</code> as a float. Returns <code>Nothing</code>
-if the global is nil or not a number. Pops the global from the stack internally.</p>
+                        <p>Fetch the global <code>name</code> as a float. Returns <code>Nothing</code> if the global is nil or not a number. Pops the global from the stack internally.</p>
 
                     </p>
                 </div>
@@ -268,9 +262,7 @@ if the global is nil or not a number. Pops the global from the stack internally.
                         (get-int-field lua index name)
                     </pre>
                     <p class="doc">
-                        <p>Read field <code>name</code> from the table at <code>index</code> as an integer.
-Returns <code>Nothing</code> if the field is nil or not a number. Pops the field value
-from the stack internally, leaving only the table.</p>
+                        <p>Read field <code>name</code> from the table at <code>index</code> as an integer. Returns <code>Nothing</code> if the field is nil or not a number. Pops the field value from the stack internally, leaving only the table.</p>
 
                     </p>
                 </div>
@@ -290,8 +282,7 @@ from the stack internally, leaving only the table.</p>
                         (get-int-global lua name)
                     </pre>
                     <p class="doc">
-                        <p>Fetch the global <code>name</code> as an integer. Returns <code>Nothing</code>
-if the global is nil or not a number. Pops the global from the stack internally.</p>
+                        <p>Fetch the global <code>name</code> as an integer. Returns <code>Nothing</code> if the global is nil or not a number. Pops the global from the stack internally.</p>
 
                     </p>
                 </div>
@@ -311,9 +302,7 @@ if the global is nil or not a number. Pops the global from the stack internally.
                         (get-string-field lua index name)
                     </pre>
                     <p class="doc">
-                        <p>Read field <code>name</code> from the table at <code>index</code> as a Carp
-<code>String</code>. Returns <code>Nothing</code> if the field is nil or not a string. Pops the field
-value from the stack internally, leaving only the table.</p>
+                        <p>Read field <code>name</code> from the table at <code>index</code> as a Carp <code>String</code>. Returns <code>Nothing</code> if the field is nil or not a string. Pops the field value from the stack internally, leaving only the table.</p>
 
                     </p>
                 </div>
@@ -333,9 +322,7 @@ value from the stack internally, leaving only the table.</p>
                         (get-string-global lua name)
                     </pre>
                     <p class="doc">
-                        <p>Fetch the global <code>name</code> as a Carp <code>String</code>. Returns
-<code>Nothing</code> if the global is nil or not a string. Pops the global from the stack
-internally.</p>
+                        <p>Fetch the global <code>name</code> as a Carp <code>String</code>. Returns <code>Nothing</code> if the global is nil or not a string. Pops the global from the stack internally.</p>
 
                     </p>
                 </div>
@@ -381,8 +368,7 @@ state argument is inserted into the push expression automatically.</p>
                         (maybe-get-bool lua index)
                     </pre>
                     <p class="doc">
-                        <p>Read the value at <code>index</code> as a boolean, returning
-<code>Nothing</code> if it is not a boolean. Leaves the stack unchanged.</p>
+                        <p>Read the value at <code>index</code> as a boolean, returning <code>Nothing</code> if it is not a boolean. Leaves the stack unchanged.</p>
 
                     </p>
                 </div>
@@ -402,8 +388,7 @@ state argument is inserted into the push expression automatically.</p>
                         (maybe-get-float lua index)
                     </pre>
                     <p class="doc">
-                        <p>Read the value at <code>index</code> as a float, returning
-<code>Nothing</code> if it is not a number. Leaves the stack unchanged.</p>
+                        <p>Read the value at <code>index</code> as a float, returning <code>Nothing</code> if it is not a number. Leaves the stack unchanged.</p>
 
                     </p>
                 </div>
@@ -423,8 +408,7 @@ state argument is inserted into the push expression automatically.</p>
                         (maybe-get-int lua index)
                     </pre>
                     <p class="doc">
-                        <p>Read the value at <code>index</code> as an integer, returning
-<code>Nothing</code> if it is not a number. Leaves the stack unchanged.</p>
+                        <p>Read the value at <code>index</code> as an integer, returning <code>Nothing</code> if it is not a number. Leaves the stack unchanged.</p>
 
                     </p>
                 </div>
@@ -444,8 +428,7 @@ state argument is inserted into the push expression automatically.</p>
                         (maybe-get-string lua index)
                     </pre>
                     <p class="doc">
-                        <p>Read the value at <code>index</code> as a Carp <code>String</code>, returning
-<code>Nothing</code> if it is not a string. Leaves the stack unchanged.</p>
+                        <p>Read the value at <code>index</code> as a Carp <code>String</code>, returning <code>Nothing</code> if it is not a string. Leaves the stack unchanged.</p>
 
                     </p>
                 </div>
@@ -465,8 +448,7 @@ state argument is inserted into the push expression automatically.</p>
                         (set-bool-field lua index name value)
                     </pre>
                     <p class="doc">
-                        <p>Set field <code>name</code> to <code>value</code> on the table at <code>index</code>.
-Handles the stack index shift from pushing the value internally.</p>
+                        <p>Set field <code>name</code> to <code>value</code> on the table at <code>index</code>. Handles the stack index shift from pushing the value internally.</p>
 
                     </p>
                 </div>
@@ -506,8 +488,7 @@ Handles the stack index shift from pushing the value internally.</p>
                         (set-float-field lua index name value)
                     </pre>
                     <p class="doc">
-                        <p>Set field <code>name</code> to <code>value</code> on the table at <code>index</code>.
-Handles the stack index shift from pushing the value internally.</p>
+                        <p>Set field <code>name</code> to <code>value</code> on the table at <code>index</code>. Handles the stack index shift from pushing the value internally.</p>
 
                     </p>
                 </div>
@@ -547,8 +528,7 @@ Handles the stack index shift from pushing the value internally.</p>
                         (set-int-field lua index name value)
                     </pre>
                     <p class="doc">
-                        <p>Set field <code>name</code> to <code>value</code> on the table at <code>index</code>.
-Handles the stack index shift from pushing the value internally.</p>
+                        <p>Set field <code>name</code> to <code>value</code> on the table at <code>index</code>. Handles the stack index shift from pushing the value internally.</p>
 
                     </p>
                 </div>
@@ -588,8 +568,27 @@ Handles the stack index shift from pushing the value internally.</p>
                         (set-string-field lua index name value)
                     </pre>
                     <p class="doc">
-                        <p>Set field <code>name</code> to the string <code>value</code> on the table at
-<code>index</code>. Handles the stack index shift from pushing the value internally.</p>
+                        <p>Set field <code>name</code> to <code>value</code> on the table at <code>index</code>. Handles the stack index shift from pushing the value internally.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#set-string-global">
+                        <h3 id="set-string-global">
+                            set-string-global
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), (Ref String b), (Ref String c)] ())
+                    </p>
+                    <pre class="args">
+                        (set-string-global lua name value)
+                    </pre>
+                    <p class="doc">
+                        <p>Push <code>value</code> and assign it to the global <code>name</code>.</p>
 
                     </p>
                 </div>
