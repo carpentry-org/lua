@@ -28,11 +28,12 @@
     ""
     (let [ch (Dynamic.String.slice s 0 1)
           rest (Dynamic.String.slice s 1 (Dynamic.String.length s))
-          repl (if (= ch "-")
-            "_MINUS_"
-            (if (= ch ".")
-              "_"
-              (if (= ch "?") "_QMARK_" (if (= ch "!") "_BANG_" ch))))]
+          repl (cond
+            (= ch "-") "_MINUS_"
+            (= ch ".") "_"
+            (= ch "?") "_QMARK_"
+            (= ch "!") "_BANG_"
+            ch)]
       (Dynamic.String.concat [repl (luax--to-c-ident rest)]))))
 
 (defndynamic luax--fn-c-name [sym]
