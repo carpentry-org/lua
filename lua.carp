@@ -23,6 +23,21 @@
           (Lua.set-field %lua -2 (cstr %(Symbol.str field-name))))
         (luax--make-field-stmts lua (cdr field-specs))))))
 
+(defndynamic luax--to-c-ident [s]
+  (if (= (Dynamic.String.length s) 0)
+    ""
+    (let [ch (Dynamic.String.slice s 0 1)
+          rest (Dynamic.String.slice s 1 (Dynamic.String.length s))
+          repl (if (= ch "-")
+            "_MINUS_"
+            (if (= ch ".")
+              "_"
+              (if (= ch "?") "_QMARK_" (if (= ch "!") "_BANG_" ch))))]
+      (Dynamic.String.concat [repl (luax--to-c-ident rest)]))))
+
+(defndynamic luax--fn-c-name [sym]
+  (Dynamic.String.concat ["luax_cfn_" (luax--to-c-ident (Symbol.str sym))]))
+
 (defmacro luax--def-maybe-get [suffix type-const getter article type-article]
   (let [fn-name (Symbol.concat ['maybe-get- suffix])
         doc-str (Dynamic.String.concat
@@ -368,7 +383,78 @@ global, `args` is a list of parameter names, and `body` is the Lua source.
                  (cdr args)))
              ") "
              body
-             " end"]))))
+             " end"])))
+
+  (doc prepare-cfunction "Declare a Carp function as pushable onto a Lua stack.
+Must be called at the top level, before any use of
+[`push-cfunction`](#push-cfunction) or [`register-fn`](#register-fn) with this
+function. The function must be a top-level `defn` with signature
+`(Fn [&Lua] Int)`.
+
+```
+(defn square [l]
+  (let [x (Lua.get-int l 1)]
+    (do (Lua.push-int l (* x x)) 1)))
+
+(Lua.prepare-cfunction square)
+```")
+  (defmacro prepare-cfunction [fn-sym]
+    (let [cfn (luax--fn-c-name fn-sym)
+          helper (Symbol.concat ['luax--push-cfn-- fn-sym])
+          the-type '(Fn [(Ref Lua)] ())]
+      `(do
+        (c-name %fn-sym %cfn)
+        (deftemplate %helper
+                     %the-type
+                     %(Dynamic.String.concat
+                       ["int " cfn "(lua_State*); void $NAME(lua_State* l)"])
+                     %(Dynamic.String.concat
+                       ["$DECL { lua_pushcfunction(l, " cfn "); }"])))))
+
+  (doc push-cfunction "Push a prepared Carp function onto the Lua stack as a
+C function. The function must have been declared with
+[`prepare-cfunction`](#prepare-cfunction) at the top level first.
+
+```
+(defn square [l]
+  (let [x (Lua.get-int l 1)]
+    (do (Lua.push-int l (* x x)) 1)))
+
+(Lua.prepare-cfunction square)
+
+(Lua.with-lua-do
+  (Lua.push-cfunction lua square)
+  (Lua.set-global lua (cstr \"square\")))
+```")
+  (defmacro push-cfunction [lua fn-sym]
+    (let [helper (Symbol.concat ['luax--push-cfn-- fn-sym])] `(%helper %lua)))
+
+  (doc register-fn "Register a Carp function as a Lua global, making it callable
+from Lua scripts. The function must have been declared with
+[`prepare-cfunction`](#prepare-cfunction) at the top level first. `name` is the
+Lua-side name (a symbol).
+
+The function must be a top-level `defn` with signature `(Fn [&Lua] Int)`:
+it receives arguments via the Lua stack (1-indexed from the bottom) and
+must return the number of results pushed.
+
+```
+(defn my-add [l]
+  (let [a (Lua.get-int l 1)
+        b (Lua.get-int l 2)]
+    (do (Lua.push-int l (+ a b)) 1)))
+
+(Lua.prepare-cfunction my-add)
+
+(Lua.with-lua-do
+  (Lua.libs lua)
+  (Lua.register-fn lua add my-add)
+  (ignore (Lua.do-string lua (cstr \"print(add(3, 4))\"))))
+```")
+  (defmacro register-fn [lua name fn-sym]
+    `(do
+      (Lua.push-cfunction %lua %fn-sym)
+      (Lua.set-global %lua (cstr %(Symbol.str name))))))
 
 (doc Lua "provides bindings for embedding Lua in Carp. It wraps the Lua C API
 directly, following its stack-based model: you push values onto a virtual stack,
@@ -417,8 +503,24 @@ setting fields with [`set-field`](#set-field), and optionally assigning the
 table to a global with [`set-global`](#set-global).
 
 The module also provides convenience macros: [`fun`](#fun) defines a Lua
-function from inline source, and [`val`](#val) evaluates a Lua expression into
-a global. For higher-level functions that handle type checking and error
+function from inline source, [`val`](#val) evaluates a Lua expression into
+a global, and [`register-fn`](#register-fn) registers a Carp function as a
+Lua global so that Lua scripts can call back into Carp:
+
+```
+(defn double-it [l]
+  (let [x (Lua.get-int l 1)]
+    (do (Lua.push-int l (* x 2)) 1)))
+
+(Lua.prepare-cfunction double-it)
+
+(Lua.with-lua-do
+  (Lua.libs lua)
+  (Lua.register-fn lua double double-it)
+  (ignore (Lua.do-string lua (cstr \"print(double(21))\"))))
+```
+
+For higher-level functions that handle type checking and error
 wrapping automatically, see [`Luax`](#Luax).")
 
 (doc Luax "provides a safe, higher-level interface over [`Lua`](#Lua). Where the
