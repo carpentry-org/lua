@@ -6,16 +6,6 @@
 (add-cflag "-L/opt/homebrew/lib")
 (Lua.setup "lua")
 
-; === C function for metatable __add ===
-
-(defn test-point-add [l]
-  (let-do [ax (Lua.get-int l 1)
-           bx (Lua.get-int l 2)]
-    (Lua.push-int l (+ ax bx))
-    1))
-
-(Lua.prepare-cfunction test-point-add)
-
 (deftest test
   ; === raw-get / raw-set ===
   (assert-equal test
