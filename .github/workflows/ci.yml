@@ -39,6 +39,8 @@ jobs:
           set -euo pipefail
           carp -x test/lua.carp
           carp -x test/midlevel.carp
+          carp -x test/cfunction.carp
+          carp -x test/metatable.carp
 
       - name: Install angler
         run: |

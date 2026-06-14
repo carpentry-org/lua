@@ -221,6 +221,10 @@ Use [`Luax.do-in`](#do-in) for a version that returns `Result`.")
   (register TYPE_TABLE Int "LUA_TTABLE")
   (doc TYPE_FUNCTION "Type constant for function values.")
   (register TYPE_FUNCTION Int "LUA_TFUNCTION")
+  (doc TYPE_USERDATA "Type constant for full userdata values.")
+  (register TYPE_USERDATA Int "LUA_TUSERDATA")
+  (doc TYPE_LIGHTUSERDATA "Type constant for light userdata values.")
+  (register TYPE_LIGHTUSERDATA Int "LUA_TLIGHTUSERDATA")
   (doc type-of
     "Return the type constant of the value at `index`. Compare against
 `TYPE_NIL`, `TYPE_NUMBER`, etc.")
@@ -249,6 +253,75 @@ the table at `index`. Returns a type constant.")
 `index`. Returns 0 when there are no more entries. Used for iterating tables
 with [`push-nil`](#push-nil) as the initial key.")
   (register next (Fn [&Lua Int] Int) "lua_next")
+
+  ; === Raw table access ===
+
+  (doc raw-get
+    "Like [`get-table`](#get-table) but bypasses metamethods. Pops the
+key from the stack and pushes the value. Returns the type of the result.")
+  (register raw-get (Fn [&Lua Int] Int) "lua_rawget")
+  (doc raw-set
+    "Like [`set-table`](#set-table) but bypasses metamethods. Pops both
+the key and the value from the stack.")
+  (register raw-set (Fn [&Lua Int] ()) "lua_rawset")
+  (doc raw-geti
+    "Push `t[n]` onto the stack without invoking metamethods, where `t`
+is the table at `index`. Returns the type of the result.")
+  (register raw-geti (Fn [&Lua Int Int] Int) "lua_rawgeti")
+  (doc raw-seti "Pop the top value and set it as `t[n]` without invoking
+metamethods, where `t` is the table at `index`.")
+  (register raw-seti (Fn [&Lua Int Int] ()) "lua_rawseti")
+  (doc raw-len "Return the raw length of the value at `index` (table, string, or
+full userdata) without invoking the `__len` metamethod.")
+  (deftemplate raw-len
+               (Fn [&Lua Int] Int)
+               "int $NAME(lua_State* l, int i)"
+               "$DECL { return (int) lua_rawlen(l, i); }")
+
+  ; === Metatable operations ===
+
+  (doc get-metatable "Push the metatable of the value at `index` onto the stack.
+Returns `true` if the value has a metatable, `false` otherwise (and nothing is
+pushed).")
+  (register get-metatable (Fn [&Lua Int] Bool) "lua_getmetatable")
+  (doc set-metatable "Pop the table from the top of the stack and set it as the
+metatable for the value at `index`.")
+  (deftemplate set-metatable
+               (Fn [&Lua Int] ())
+               "void $NAME(lua_State* l, int i)"
+               "$DECL { lua_setmetatable(l, i); }")
+  (doc new-metatable
+    "Create or look up a named metatable in the Lua registry and
+push it onto the stack. Returns `true` if a new table was created, `false` if
+the name already existed. Either way the metatable is on top of the stack
+afterward.")
+  (register new-metatable (Fn [&Lua (Ptr CChar)] Bool) "luaL_newmetatable")
+  (doc set-named-metatable
+    "Set the metatable of the value on top of the stack to
+the metatable associated with `name` in the registry. The value remains on the
+stack.")
+  (register set-named-metatable (Fn [&Lua (Ptr CChar)] ()) "luaL_setmetatable")
+
+  ; === Userdata ===
+
+  (doc new-userdata "Allocate `size` bytes as a full userdata, push it onto the
+stack, and return a pointer to the allocated block. The userdata is
+garbage-collected by Lua. Use [`set-metatable`](#set-metatable) or
+[`set-named-metatable`](#set-named-metatable) to attach a metatable.")
+  (deftemplate new-userdata
+               (Fn [&Lua Int] (Ptr ()))
+               "void* $NAME(lua_State* l, int sz)"
+               "$DECL { return lua_newuserdata(l, (size_t) sz); }")
+  (doc check-userdata "Return a pointer to the userdata at `index` if it has the
+metatable `name` from the registry. Raises a Lua error otherwise (catchable with
+[`call`](#call)).")
+  (register check-userdata
+    (Fn [&Lua Int (Ptr CChar)] (Ptr ()))
+    "luaL_checkudata")
+  (doc test-userdata
+    "Like [`check-userdata`](#check-userdata) but returns a null
+pointer instead of raising a Lua error when the check fails.")
+  (register test-userdata (Fn [&Lua Int (Ptr CChar)] (Ptr ())) "luaL_testudata")
 
   (doc do-file "Load and execute a Lua file. Returns a status code. Use
 [`eval-file`](#eval-file) for a version that returns `Result`.")
@@ -501,7 +574,18 @@ replaces the function and arguments on the stack.
 
 Tables are built by creating an empty table with [`create-table`](#create-table),
 setting fields with [`set-field`](#set-field), and optionally assigning the
-table to a global with [`set-global`](#set-global).
+table to a global with [`set-global`](#set-global). Raw table access
+([`raw-get`](#raw-get), [`raw-set`](#raw-set), [`raw-geti`](#raw-geti),
+[`raw-seti`](#raw-seti)) bypasses metamethods for direct table manipulation.
+
+Metatables enable object-oriented patterns and operator overloading. Use
+[`new-metatable`](#new-metatable) to create a named metatable in the registry,
+[`set-metatable`](#set-metatable) to attach it to a table or userdata, and
+[`get-metatable`](#get-metatable) to retrieve it.
+
+Full userdata ([`new-userdata`](#new-userdata)) allocates GC-managed memory on
+the Lua side, useful for exposing Carp-created objects to Lua scripts with
+metatables for method dispatch.
 
 The module also provides convenience macros: [`fun`](#fun) defines a Lua
 function from inline source, [`val`](#val) evaluates a Lua expression into
@@ -621,6 +705,15 @@ and assigns it to a global in one expression:
                        get-carp-str
                        "a Carp `String`"
                        "a string")
+
+  (doc maybe-get-userdata "Read the value at `index` as a userdata pointer,
+returning `Nothing` if it is not a full or light userdata. Leaves the stack
+unchanged.")
+  (defn maybe-get-userdata [lua index]
+    (let [t (Lua.type-of lua index)]
+      (if (or (= t Lua.TYPE_USERDATA) (= t Lua.TYPE_LIGHTUSERDATA))
+        (Maybe.Just (Lua.get-user-data lua index))
+        (Maybe.Nothing))))
 
   ; === set-*-global family ===
   (luax--def-set-global int Lua.push-int)
