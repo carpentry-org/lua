@@ -124,6 +124,8 @@
   (doc GC_ERROR
     "Status code returned when the garbage collector metamethod fails.")
   (register GC_ERROR Int "LUA_ERRGCMM")
+  (doc YIELD "Status code returned when a coroutine yields.")
+  (register YIELD Int "LUA_YIELD")
 
   (doc setup "Set up Lua includes and linking. `location` is the include path
 (e.g. `\"lua\"` or `\"lua5.4\"`). An optional second argument overrides the
@@ -225,6 +227,8 @@ Use [`Luax.do-in`](#do-in) for a version that returns `Result`.")
   (register TYPE_USERDATA Int "LUA_TUSERDATA")
   (doc TYPE_LIGHTUSERDATA "Type constant for light userdata values.")
   (register TYPE_LIGHTUSERDATA Int "LUA_TLIGHTUSERDATA")
+  (doc TYPE_THREAD "Type constant for thread (coroutine) values.")
+  (register TYPE_THREAD Int "LUA_TTHREAD")
   (doc type-of
     "Return the type constant of the value at `index`. Compare against
 `TYPE_NIL`, `TYPE_NUMBER`, etc.")
@@ -322,6 +326,47 @@ metatable `name` from the registry. Raises a Lua error otherwise (catchable with
     "Like [`check-userdata`](#check-userdata) but returns a null
 pointer instead of raising a Lua error when the check fails.")
   (register test-userdata (Fn [&Lua Int (Ptr CChar)] (Ptr ())) "luaL_testudata")
+
+  ; === Coroutines ===
+
+  (doc new-thread "Create a new coroutine as a thread of the given state. Pushes
+the new thread onto the stack and returns a pointer to it. The coroutine shares
+the global environment with the parent but has its own execution stack. Do not
+call [`close`](#close) on the returned thread—it is garbage-collected by the
+parent state.")
+  (register new-thread (Fn [&Lua] &Lua) "lua_newthread")
+  (doc coroutine-status "Return the status of a coroutine: [`OK`](#OK) if the
+coroutine has not started or finished successfully, [`YIELD`](#YIELD) if it is
+suspended, or an error code if it terminated with an error.")
+  (register coroutine-status (Fn [&Lua] Int) "lua_status")
+  (doc is-yieldable? "Return `true` if the given coroutine can yield.")
+  (deftemplate is-yieldable?
+               (Fn [&Lua] Bool)
+               "bool $NAME(lua_State* l)"
+               "$DECL { return lua_isyieldable(l); }")
+  (doc resume "Resume a suspended coroutine. Before the first resume, push the
+function to call onto the coroutine’s stack; on subsequent resumes, push values
+to return from [`yield`](#yield). `nargs` is the number of values pushed.
+`from` is the calling state. Returns [`OK`](#OK) when the coroutine finishes,
+[`YIELD`](#YIELD) when it suspends, or an error code. Results are left on the
+coroutine’s stack.")
+  (deftemplate resume
+               (Fn [&Lua &Lua Int] Int)
+               "int $NAME(lua_State* co, lua_State* from, int nargs)"
+               "$DECL { int nres; return lua_resume(co, from, nargs, &nres); }")
+  (doc yield "Yield the current coroutine with `nresults` values from the top of
+the stack. Can only be used as the return expression of a C function registered
+with [`prepare-cfunction`](#prepare-cfunction).")
+  (deftemplate yield
+               (Fn [&Lua Int] Int)
+               "int $NAME(lua_State* l, int n)"
+               "$DECL { return lua_yield(l, n); }")
+  (doc to-thread "Read the value at `index` as a `Lua` state pointer. Returns a
+null pointer if the value is not a thread.")
+  (deftemplate to-thread
+               (Fn [&Lua Int] &Lua)
+               "lua_State* $NAME(lua_State* l, int i)"
+               "$DECL { return lua_tothread(l, i); }")
 
   (doc do-file "Load and execute a Lua file. Returns a status code. Use
 [`eval-file`](#eval-file) for a version that returns `Result`.")
@@ -587,6 +632,29 @@ Full userdata ([`new-userdata`](#new-userdata)) allocates GC-managed memory on
 the Lua side, useful for exposing Carp-created objects to Lua scripts with
 metatables for method dispatch.
 
+Coroutines are created with [`new-thread`](#new-thread), which returns a new
+execution context sharing the parent’s globals. Push a function onto the
+coroutine’s stack, then drive it with [`resume`](#resume). The coroutine
+yields values back via `coroutine.yield()` (Lua side) or [`yield`](#yield)
+(C function side, tail-call only). Check [`coroutine-status`](#coroutine-status)
+or the return value of `resume` ([`OK`](#OK) vs [`YIELD`](#YIELD)) to
+distinguish completion from suspension.
+
+```
+(Lua.with-lua-do
+  (Lua.libs lua)
+  (ignore (Lua.do-string lua
+    (cstr \"function gen() coroutine.yield(1); return 2 end\")))
+  (let [co (Lua.new-thread lua)]
+    (do
+      (Lua.get-global co (cstr \"gen\"))
+      (ignore (Lua.resume co lua 0))       ; yields 1
+      (IO.println &(str (Lua.get-int co -1)))
+      (Lua.pop co 1)
+      (ignore (Lua.resume co lua 0))       ; returns 2
+      (IO.println &(str (Lua.get-int co -1))))))
+```
+
 The module also provides convenience macros: [`fun`](#fun) defines a Lua
 function from inline source, [`val`](#val) evaluates a Lua expression into
 a global, and [`register-fn`](#register-fn) registers a Carp function as a
@@ -684,6 +752,22 @@ and assigns it to a global in one expression:
 (match (Luax.do-in lua \"x = 1 + nil\")
   (Result.Success _) ()
   (Result.Error e) (IO.println &(fmt \"caught: %s\" &e)))
+```
+
+**Coroutines.** [`resume-coroutine`](#resume-coroutine) wraps
+[`Lua.resume`](#resume) with `Result` error handling, and
+[`coroutine-suspended?`](#coroutine-suspended?) /
+[`coroutine-finished?`](#coroutine-finished?) provide status predicates:
+
+```
+(let [co (Lua.new-thread lua)]
+  (do
+    (Lua.get-global co (cstr \"gen\"))
+    (match (Luax.resume-coroutine co lua 0)
+      (Result.Success status)
+        (when (= status Lua.YIELD)
+          (IO.println &(str (Lua.get-int co -1))))
+      (Result.Error e) (IO.errorln &e))))
 ```")
 
 (defmodule Luax
@@ -810,4 +894,28 @@ state argument is inserted into the push expression automatically.
       `(do
         (Lua.create-table %lua 0 %n)
         %@stmts
-        (Lua.set-global %lua (cstr %(Symbol.str name)))))))
+        (Lua.set-global %lua (cstr %(Symbol.str name))))))
+
+  ; === Coroutine helpers ===
+
+  (doc coroutine-suspended?
+    "Return `true` if the coroutine is suspended (has yielded).")
+  (defn coroutine-suspended? [co] (= (Lua.coroutine-status co) Lua.YIELD))
+
+  (doc coroutine-finished?
+    "Return `true` if the coroutine has finished or has not yet started.")
+  (defn coroutine-finished? [co] (= (Lua.coroutine-status co) Lua.OK))
+
+  (doc resume-coroutine
+    "Resume the coroutine `co` from state `from` with `nargs`
+arguments already pushed onto `co`’s stack. Returns `(Success status)` where
+`status` is [`OK`](#OK) (coroutine finished) or [`YIELD`](#YIELD) (coroutine
+suspended), or `(Error msg)` if the coroutine raised an error. Results or
+yielded values are left on `co`’s stack.")
+  (sig resume-coroutine (Fn [&Lua &Lua Int] (Result Int String)))
+  (defn resume-coroutine [co from nargs]
+    (let [status (Lua.resume co from nargs)]
+      (if (or (= status Lua.OK) (= status Lua.YIELD))
+        (Result.Success status)
+        (Result.Error
+          (String.from-cstr-or (Lua.to-string co -1) @"coroutine error"))))))
