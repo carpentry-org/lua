@@ -254,8 +254,6 @@ the table at `index`. Returns a type constant.")
 with [`push-nil`](#push-nil) as the initial key.")
   (register next (Fn [&Lua Int] Int) "lua_next")
 
-  ; === Raw table access ===
-
   (doc raw-get
     "Like [`get-table`](#get-table) but bypasses metamethods. Pops the
 key from the stack and pushes the value. Returns the type of the result.")
@@ -278,8 +276,6 @@ full userdata) without invoking the `__len` metamethod.")
                "int $NAME(lua_State* l, int i)"
                "$DECL { return (int) lua_rawlen(l, i); }")
 
-  ; === Metatable operations ===
-
   (doc get-metatable "Push the metatable of the value at `index` onto the stack.
 Returns `true` if the value has a metatable, `false` otherwise (and nothing is
 pushed).")
@@ -301,8 +297,6 @@ afterward.")
 the metatable associated with `name` in the registry. The value remains on the
 stack.")
   (register set-named-metatable (Fn [&Lua (Ptr CChar)] ()) "luaL_setmetatable")
-
-  ; === Userdata ===
 
   (doc new-userdata "Allocate `size` bytes as a full userdata, push it onto the
 stack, and return a pointer to the allocated block. The userdata is
@@ -361,7 +355,7 @@ in a `do` block. This is the most common entry point.
   (Lua.push-int lua 42)
   (IO.println &(str (Lua.get-int lua -1))))
 ```")
-  (defmacro with-lua-do [:rest body] `(Lua.with-lua-as lua (do %@body)))
+  (defmacro with-lua-do [:rest body] `(Lua.with-lua-as lua %(cons 'do body)))
 
   (doc evaluate "Create a temporary Lua state, evaluate the expression `s`, and
 return its string representation as a `Result`. Useful for one-off evaluations
@@ -692,7 +686,6 @@ and assigns it to a global in one expression:
   (defn get-carp-str [lua index]
     (String.from-cstr-or (Lua.to-string lua index) @""))
 
-  ; === maybe-get-* family ===
   (luax--def-maybe-get int Lua.TYPE_NUMBER Lua.get-int "an integer" "a number")
   (luax--def-maybe-get float Lua.TYPE_NUMBER Lua.get-float "a float" "a number")
   (luax--def-maybe-get bool
@@ -715,13 +708,11 @@ unchanged.")
         (Maybe.Just (Lua.get-user-data lua index))
         (Maybe.Nothing))))
 
-  ; === set-*-global family ===
   (luax--def-set-global int Lua.push-int)
   (luax--def-set-global float Lua.push-float)
   (luax--def-set-global bool Lua.push-bool)
   (luax--def-set-global string Lua.push-carp-str)
 
-  ; === get-*-global family ===
   (luax--def-get-global int Lua.TYPE_NUMBER Lua.get-int "an integer" "a number")
   (luax--def-get-global float Lua.TYPE_NUMBER Lua.get-float "a float" "a number")
   (luax--def-get-global bool
@@ -735,13 +726,11 @@ unchanged.")
                         "a Carp `String`"
                         "a string")
 
-  ; === set-*-field family ===
   (luax--def-set-field int Lua.push-int)
   (luax--def-set-field float Lua.push-float)
   (luax--def-set-field bool Lua.push-bool)
   (luax--def-set-field string Lua.push-carp-str)
 
-  ; === get-*-field family ===
   (luax--def-get-field int Lua.TYPE_NUMBER Lua.get-int "an integer" "a number")
   (luax--def-get-field float Lua.TYPE_NUMBER Lua.get-float "a float" "a number")
   (luax--def-get-field bool
