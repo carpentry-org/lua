@@ -6,21 +6,18 @@
   (Lua.with-lua-do
     (Lua.libs lua)
 
-    ; build a table from Carp using make-table
     (Luax.make-table lua player
       (name (Lua.push-carp-str "Ada"))
       (hp (Lua.push-int 100))
       (x (Lua.push-float 3.5f))
       (y (Lua.push-float 7.0f)))
 
-    ; use it from Lua
     (ignore (Lua.do-string lua (cstr "
       print('name: ' .. player.name)
       print('hp:   ' .. player.hp)
       print('pos:  ' .. player.x .. ', ' .. player.y)
     ")))
 
-    ; read fields back into Carp with Luax
     (Lua.get-global lua (cstr "player"))
     (match (Luax.get-string-field lua -1 "name")
       (Maybe.Just name) (IO.println &(fmt "carp sees name: %s" &name))
@@ -30,7 +27,6 @@
       (Maybe.Nothing) (IO.errorln "hp not found"))
     (Lua.pop lua 1)
 
-    ; modify a table built in Lua
     (ignore (Lua.do-string lua (cstr "enemy = {name='Bug', hp=50}")))
     (Lua.get-global lua (cstr "enemy"))
     (Luax.set-int-field lua -1 "hp" 0)

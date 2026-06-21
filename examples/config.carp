@@ -12,7 +12,6 @@
         (IO.errorln &(fmt "failed to load config: %s" &e))
       (Result.Success _)
         (do
-          ; read config values
           (Lua.get-global lua (cstr "app"))
           (let [name (Luax.get-string-field lua -1 "name")
                 port (Luax.get-int-field lua -1 "port")
@@ -29,7 +28,6 @@
                 (Maybe.Nothing) (IO.errorln "missing app.debug"))))
           (Lua.pop lua 1)
 
-          ; call a function defined in the config file
           (let [greeting (Luax.call-fn lua greeting Luax.get-carp-str)]
             (match greeting
               (Result.Success g) (IO.println &(fmt "greeting: %s" &g))

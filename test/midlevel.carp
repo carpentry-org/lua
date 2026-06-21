@@ -7,7 +7,6 @@
 (Lua.setup "lua")
 
 (deftest test
-  ; === maybe-get-int ===
   (assert-true test
     (= &(Maybe.Just 42)
        &(Lua.with-lua-do (Lua.push-int lua 42) (Luax.maybe-get-int lua -1)))
@@ -23,7 +22,6 @@
       &(Lua.with-lua-do (Lua.push-nil lua) (Luax.maybe-get-int lua -1)))
     "maybe-get-int returns Nothing for nil")
 
-  ; === maybe-get-float ===
   (assert-true test
     (= &(Maybe.Just 2.5f)
        &(Lua.with-lua-do (Lua.push-float lua 2.5f) (Luax.maybe-get-float lua -1)))
@@ -33,7 +31,6 @@
       &(Lua.with-lua-do (Lua.push-bool lua true) (Luax.maybe-get-float lua -1)))
     "maybe-get-float returns Nothing for boolean value")
 
-  ; === maybe-get-bool ===
   (assert-true test
     (= &(Maybe.Just true)
        &(Lua.with-lua-do (Lua.push-bool lua true) (Luax.maybe-get-bool lua -1)))
@@ -47,7 +44,6 @@
       &(Lua.with-lua-do (Lua.push-int lua 42) (Luax.maybe-get-bool lua -1)))
     "maybe-get-bool returns Nothing for integer value")
 
-  ; === maybe-get-string ===
   (assert-true test
     (= &(Maybe.Just @"hello")
        &(Lua.with-lua-do
@@ -63,7 +59,6 @@
       &(Lua.with-lua-do (Lua.push-nil lua) (Luax.maybe-get-string lua -1)))
     "maybe-get-string returns Nothing for nil")
 
-  ; === call-fn: integer arithmetic ===
   (assert-true test
     (= &(Result.Success 7)
        &(Lua.with-lua-do (Lua.libs lua)
@@ -75,7 +70,6 @@
                                        (Lua.push-int 4))))
     "call-fn calls a two-arg function and returns int result")
 
-  ; === call-fn: zero args ===
   (assert-true test
     (= &(Result.Success 99)
        &(Lua.with-lua-do (Lua.libs lua)
@@ -83,7 +77,6 @@
                          (Luax.call-fn lua getval Lua.get-int)))
     "call-fn works with zero arguments")
 
-  ; === call-fn: string result ===
   (assert-true test
     (= &(Result.Success @"hello world")
        &(Lua.with-lua-do (Lua.libs lua)
@@ -97,7 +90,6 @@
                                        (Lua.push-carp-str "world"))))
     "call-fn with string arg and string result")
 
-  ; === call-fn: error propagation ===
   (assert-true test
     (Result.error?
       &(Lua.with-lua-do (Lua.libs lua)
@@ -107,7 +99,6 @@
                         (Luax.call-fn lua bad Lua.get-int)))
     "call-fn returns Error when Lua function raises")
 
-  ; === call-fn: undefined function ===
   (assert-true test
     (Result.error?
       &(Lua.with-lua-do (Lua.libs lua)
@@ -117,7 +108,6 @@
                                       (Lua.push-int 1))))
     "call-fn returns Error for undefined function")
 
-  ; === call-fn: three args ===
   (assert-true test
     (= &(Result.Success 6)
        &(Lua.with-lua-do (Lua.libs lua)
@@ -130,7 +120,6 @@
                                        (Lua.push-int 3))))
     "call-fn works with three arguments")
 
-  ; === make-table: int fields ===
   (assert-equal test
     42
     (Lua.with-lua-do (Lua.libs lua)
@@ -144,7 +133,6 @@
                      (Lua.get-int lua -1))
     "make-table creates table with int fields accessible by name")
 
-  ; === make-table: mixed types ===
   (assert-true test
     (= @"Alice"
        (Lua.with-lua-do (Lua.libs lua)
@@ -157,7 +145,6 @@
                         (String.from-cstr-or (Lua.to-string lua -1) @"")))
     "make-table creates table with mixed field types")
 
-  ; === make-table: usable from Lua ===
   (assert-equal test
     30
     (Lua.with-lua-do (Lua.libs lua)
@@ -171,7 +158,6 @@
                      (Lua.get-int lua -1))
     "make-table creates table usable from Lua code")
 
-  ; === make-table: empty ===
   (assert-equal test
     0
     (Lua.with-lua-do (Lua.libs lua)
@@ -180,7 +166,6 @@
                      (Lua.table-length lua -1))
     "make-table with no fields creates empty table")
 
-  ; === set-int-global ===
   (assert-equal test
     42
     (Lua.with-lua-do (Lua.libs lua)
@@ -198,7 +183,6 @@
                      (Lua.get-int lua -1))
     "int globals set from Carp are usable in Lua expressions")
 
-  ; === set-float-global ===
   (assert-equal test
     2.5f
     (Lua.with-lua-do (Lua.libs lua)
@@ -207,7 +191,6 @@
                      (Lua.get-float lua -1))
     "set-float-global sets a float global")
 
-  ; === set-bool-global ===
   (assert-true test
     (Lua.with-lua-do (Lua.libs lua)
                      (Luax.set-bool-global lua "flag" true)
@@ -215,7 +198,6 @@
                      (Lua.get-bool lua -1))
     "set-bool-global sets a boolean global")
 
-  ; === set-string-global ===
   (assert-true test
     (= @"hello"
        (Lua.with-lua-do (Lua.libs lua)
@@ -232,7 +214,6 @@
                         (String.from-cstr-or (Lua.to-string lua -1) @"")))
     "string globals set from Carp are usable in Lua expressions")
 
-  ; === get-int-global ===
   (assert-true test
     (= &(Maybe.Just 42)
        &(Lua.with-lua-do (Lua.libs lua)
@@ -250,7 +231,6 @@
                         (Luax.get-int-global lua "s")))
     "get-int-global returns Nothing for wrong type")
 
-  ; === get-float-global ===
   (assert-true test
     (= &(Maybe.Just 2.5f)
        &(Lua.with-lua-do (Lua.libs lua)
@@ -258,7 +238,6 @@
                          (Luax.get-float-global lua "f")))
     "get-float-global returns Just for existing float")
 
-  ; === get-bool-global ===
   (assert-true test
     (= &(Maybe.Just true)
        &(Lua.with-lua-do (Lua.libs lua)
@@ -272,7 +251,6 @@
                          (Luax.get-bool-global lua "flag")))
     "get-bool-global returns Just false for false")
 
-  ; === get-string-global ===
   (assert-true test
     (= &(Maybe.Just @"hello")
        &(Lua.with-lua-do (Lua.libs lua)
@@ -284,7 +262,6 @@
       &(Lua.with-lua-do (Lua.libs lua) (Luax.get-string-global lua "nope")))
     "get-string-global returns Nothing for missing global")
 
-  ; === get-int-field ===
   (assert-true test
     (= &(Maybe.Just 42)
        &(Lua.with-lua-do (Lua.libs lua)
@@ -308,7 +285,6 @@
                         (Luax.get-int-field lua -1 "name")))
     "get-int-field returns Nothing on type mismatch")
 
-  ; === get-string-field ===
   (assert-true test
     (= &(Maybe.Just @"Alice")
        &(Lua.with-lua-do (Lua.libs lua)
@@ -318,7 +294,6 @@
                          (Luax.get-string-field lua -1 "name")))
     "get-string-field returns Just for existing string field")
 
-  ; === get-float-field ===
   (assert-true test
     (= &(Maybe.Just 1.5f)
        &(Lua.with-lua-do (Lua.libs lua)
@@ -327,7 +302,6 @@
                          (Luax.get-float-field lua -1 "val")))
     "get-float-field returns Just for existing float field")
 
-  ; === get-bool-field ===
   (assert-true test
     (= &(Maybe.Just true)
        &(Lua.with-lua-do (Lua.libs lua)
@@ -337,7 +311,6 @@
                          (Luax.get-bool-field lua -1 "active")))
     "get-bool-field returns Just for existing bool field")
 
-  ; === set-int-field ===
   (assert-equal test
     42
     (Lua.with-lua-do (Lua.libs lua)
@@ -360,7 +333,6 @@
                      (Lua.get-int lua -1))
     "set-int-field adds a field to a table")
 
-  ; === set-float-field ===
   (assert-equal test
     2.5f
     (Lua.with-lua-do (Lua.libs lua)
@@ -372,7 +344,6 @@
                      (Lua.get-float lua -1))
     "set-float-field sets a float field on a table")
 
-  ; === set-bool-field ===
   (assert-true test
     (Lua.with-lua-do (Lua.libs lua)
                      (Lua.create-table lua 0 1)
@@ -383,7 +354,6 @@
                      (Lua.get-bool lua -1))
     "set-bool-field sets a bool field on a table")
 
-  ; === set-string-field ===
   (assert-true test
     (= @"hello"
        (Lua.with-lua-do (Lua.libs lua)
@@ -395,7 +365,6 @@
                         (String.from-cstr-or (Lua.to-string lua -1) @"")))
     "set-string-field sets a string field on a table")
 
-  ; === set field + get field round-trip via Luax ===
   (assert-true test
     (= &(Maybe.Just 42)
        &(Lua.with-lua-do (Lua.libs lua)
@@ -413,7 +382,6 @@
                          (Luax.get-string-field lua -1 "name")))
     "set-string-field and get-string-field round-trip")
 
-  ; === set field visible from Lua ===
   (assert-equal test
     30
     (Lua.with-lua-do (Lua.libs lua)
@@ -427,7 +395,6 @@
                      (Lua.get-int lua -1))
     "fields set via Luax are accessible from Lua code")
 
-  ; === do-in ===
   (assert-true test
     (Result.success? &(Lua.with-lua-do (Lua.libs lua) (Luax.do-in lua "x = 42")))
     "do-in returns Success for valid code")

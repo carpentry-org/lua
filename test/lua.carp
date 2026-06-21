@@ -7,7 +7,6 @@
 (Lua.setup "lua")
 
 (deftest test
-  ; === evaluate ===
   (assert-true test
     (= &(Result.Success @"2") &(Lua.evaluate "1 + 1"))
     "evaluate integer arithmetic")
@@ -37,7 +36,6 @@
     (Result.error? &(Lua.evaluate "undefined_var()"))
     "evaluate returns error on undefined function call")
 
-  ; === push and get: int, float, bool, string ===
   (assert-equal test
     42
     (Lua.with-lua-do (Lua.push-int lua 42) (Lua.get-int lua -1))
@@ -69,7 +67,6 @@
          (String.from-cstr-or (Lua.to-string lua -1) @"")))
     "push-carp-str round-trip with spaces and digits")
 
-  ; === stack management ===
   (assert-equal test
     0
     (Lua.with-lua-do (Lua.get-top lua))
@@ -98,7 +95,6 @@
                      (Lua.get-int lua -1))
     "pop leaves the correct value on top")
 
-  ; === type checking ===
   (assert-equal test
     Lua.TYPE_NUMBER
     (Lua.with-lua-do (Lua.push-int lua 42) (Lua.type-of lua -1))
@@ -132,7 +128,6 @@
                      (Lua.type-of lua -1))
     "type-of detects function")
 
-  ; === do-string ===
   (assert-equal test
     Lua.OK
     (Lua.with-lua-do (Lua.libs lua) (Lua.do-string lua (cstr "x = 42")))
@@ -142,7 +137,6 @@
         (Lua.with-lua-do (Lua.libs lua) (Lua.do-string lua (cstr "invalid$$!!"))))
     "do-string returns non-OK for syntax error")
 
-  ; === globals ===
   (assert-equal test
     42
     (Lua.with-lua-do (Lua.libs lua)
@@ -159,7 +153,6 @@
                         (String.from-cstr-or (Lua.to-string lua -1) @"")))
     "set string global via do-string, retrieve with get-global")
 
-  ; === set-string-global / get-string-global ===
   (assert-true test
     (= @"hello from carp"
        (Lua.with-lua-do (Lua.libs lua)
@@ -175,7 +168,6 @@
                         (Lua.get-string-global lua "c")))
     "Carp strings usable in Lua expressions after set-string-global")
 
-  ; === global-exists? ===
   (assert-true test
     (Lua.with-lua-do (Lua.libs lua)
                      (ignore (Lua.do-string lua (cstr "exists = 42")))
@@ -190,7 +182,6 @@
                      (Lua.global-exists? lua "falseval"))
     "global-exists? returns true for global set to false")
 
-  ; === table: create, set-field, get-field ===
   (assert-equal test
     42
     (Lua.with-lua-do (Lua.create-table lua 0 2)
@@ -214,7 +205,6 @@
                      (Lua.type-of lua -1))
     "get-field on missing key pushes nil")
 
-  ; === table: set-table / get-table with integer keys ===
   (assert-equal test
     100
     (Lua.with-lua-do (Lua.create-table lua 3 0)
@@ -232,7 +222,6 @@
                      (Lua.get-int lua -1))
     "set-table / get-table with integer keys")
 
-  ; === table: set as global and access from Lua ===
   (assert-equal test
     30
     (Lua.with-lua-do (Lua.libs lua)
@@ -248,7 +237,6 @@
                      (Lua.get-int lua -1))
     "table set as global is accessible from Lua code")
 
-  ; === table: iterate with next ===
   (assert-equal test
     2
     (Lua.with-lua-do (Lua.libs lua)
@@ -268,7 +256,6 @@
                          0)))
     "next iterates table entries")
 
-  ; === table-length ===
   (assert-equal test
     3
     (Lua.with-lua-do (Lua.libs lua)
@@ -287,7 +274,6 @@
     (Lua.with-lua-do (Lua.push-int lua 42) (Lua.table-length lua -1))
     "table-length returns -1 for non-table")
 
-  ; === val ===
   (assert-equal test
     Lua.OK
     (Lua.with-lua-do (Lua.libs lua) (Lua.val lua "x" "42"))
@@ -303,7 +289,6 @@
     (/= Lua.OK (Lua.with-lua-do (Lua.libs lua) (Lua.val lua "x" "bad$$syntax")))
     "val returns error on invalid expression")
 
-  ; === fun ===
   (assert-equal test
     7
     (Lua.with-lua-do (Lua.libs lua)
@@ -334,7 +319,6 @@
                      (Lua.get-int lua -1))
     "fun works with three arguments")
 
-  ; === call error propagation ===
   (assert-true test
     (/= Lua.OK
         (Lua.with-lua-do (Lua.libs lua)
@@ -345,7 +329,6 @@
                          (Lua.call lua 0 0 0)))
     "call returns non-OK when Lua function errors")
 
-  ; === do-file ===
   (assert-equal test
     Lua.OK
     (Lua.with-lua-do (Lua.libs lua) (Lua.do-file lua (cstr "test/test.lua")))
@@ -363,7 +346,6 @@
                          (Lua.do-file lua (cstr "test/nonexistent.lua"))))
     "do-file returns non-OK for missing file")
 
-  ; === eval-file ===
   (assert-true test
     (Result.success?
       &(Lua.with-lua-do (Lua.libs lua) (Lua.eval-file lua "test/test.lua")))
@@ -374,7 +356,6 @@
                         (Lua.eval-file lua "test/nonexistent.lua")))
     "eval-file returns Error for missing file")
 
-  ; === composing operations across a single state ===
   (assert-equal test
     30
     (Lua.with-lua-do (Lua.libs lua)

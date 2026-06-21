@@ -6,11 +6,9 @@
   (Lua.with-lua-do
     (Lua.libs lua)
 
-    ; define a function using the Lua.fun macro
     (when (/= (Lua.fun lua f [x y] "return x + y") Lua.OK)
       (IO.errorln "defining `f` failed"))
 
-    ; call it via the low-level API
     (Lua.get-global lua (cstr "f"))
     (Lua.push-int lua 1)
     (Lua.push-float lua 1.5f)
@@ -18,7 +16,6 @@
     (IO.println &(fmt "low-level: %s" &(str &(Lua.get-float lua -1))))
     (Lua.pop lua 1)
 
-    ; call it via Luax.call-fn
     (let [result (Luax.call-fn lua f Lua.get-float
                    (Lua.push-int 2)
                    (Lua.push-float 2.5f))]

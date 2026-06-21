@@ -6,8 +6,6 @@
 (add-cflag "-L/opt/homebrew/lib")
 (Lua.setup "lua")
 
-; === callback functions ===
-
 (defn test-constant [l] (do (Lua.push-int l 42) 1))
 
 (defn test-add [l]
@@ -28,8 +26,6 @@
     (Lua.push-int l (+ x 2))
     2))
 
-; === prepare all callbacks at top level ===
-
 (Lua.prepare-cfunction test-constant)
 (Lua.prepare-cfunction test-add)
 (Lua.prepare-cfunction test-negate)
@@ -37,7 +33,6 @@
 (Lua.prepare-cfunction test-multi-return)
 
 (deftest test
-  ; === push-cfunction: basic push ===
   (assert-equal test
     Lua.TYPE_FUNCTION
     (Lua.with-lua-do (Lua.libs lua)
@@ -45,7 +40,6 @@
                      (Lua.type-of lua -1))
     "push-cfunction pushes a function onto the stack")
 
-  ; === push-cfunction: callable from Carp ===
   (assert-equal test
     42
     (Lua.with-lua-do (Lua.libs lua)
@@ -54,7 +48,6 @@
                      (Lua.get-int lua -1))
     "push-cfunction: pushed function is callable via Lua.call")
 
-  ; === register-fn: zero-arg function ===
   (assert-equal test
     42
     (Lua.with-lua-do (Lua.libs lua)
@@ -64,7 +57,6 @@
                      (Lua.get-int lua -1))
     "register-fn: zero-arg function callable from Lua")
 
-  ; === register-fn: two-arg integer addition ===
   (assert-equal test
     7
     (Lua.with-lua-do (Lua.libs lua)
@@ -74,7 +66,6 @@
                      (Lua.get-int lua -1))
     "register-fn: two-arg int function callable from Lua")
 
-  ; === register-fn: float argument ===
   (assert-equal test
     -2.5f
     (Lua.with-lua-do (Lua.libs lua)
@@ -84,7 +75,6 @@
                      (Lua.get-float lua -1))
     "register-fn: float function callable from Lua")
 
-  ; === register-fn: string argument and return ===
   (assert-true test
     (= @"hello Ada"
        (Lua.with-lua-do (Lua.libs lua)
@@ -95,7 +85,6 @@
                         (String.from-cstr-or (Lua.to-string lua -1) @"")))
     "register-fn: string function callable from Lua")
 
-  ; === register-fn: multiple return values ===
   (assert-equal test
     13
     (Lua.with-lua-do (Lua.libs lua)
@@ -107,7 +96,6 @@
                      (Lua.get-int lua -1))
     "register-fn: multi-return function works from Lua")
 
-  ; === register-fn: callable via call-fn ===
   (assert-true test
     (= &(Result.Success 12)
        &(Lua.with-lua-do (Lua.libs lua)
@@ -119,7 +107,6 @@
                                        (Lua.push-int 7))))
     "register-fn: registered function works with Luax.call-fn")
 
-  ; === register-fn: composing Carp and Lua functions ===
   (assert-equal test
     20
     (Lua.with-lua-do (Lua.libs lua)
@@ -131,7 +118,6 @@
                      (Lua.get-int lua -1))
     "register-fn: Lua code can call registered Carp functions")
 
-  ; === register-fn: multiple registrations ===
   (assert-equal test
     49
     (Lua.with-lua-do (Lua.libs lua)

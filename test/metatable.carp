@@ -7,7 +7,6 @@
 (Lua.setup "lua")
 
 (deftest test
-  ; === raw-get / raw-set ===
   (assert-equal test
     42
     (Lua.with-lua-do (Lua.create-table lua 0 1)
@@ -29,7 +28,6 @@
                      (Lua.get-int lua -1))
     "raw-set and raw-get with string key")
 
-  ; === raw-geti / raw-seti ===
   (assert-equal test
     100
     (Lua.with-lua-do (Lua.create-table lua 3 0)
@@ -51,7 +49,6 @@
                      (Lua.get-int lua -1))
     "raw-geti retrieves the second element")
 
-  ; === raw-len ===
   (assert-equal test
     3
     (Lua.with-lua-do (Lua.libs lua)
@@ -64,7 +61,6 @@
     (Lua.with-lua-do (Lua.create-table lua 0 0) (Lua.raw-len lua -1))
     "raw-len returns 0 for empty table")
 
-  ; === get-metatable / set-metatable ===
   (assert-false test
     (Lua.with-lua-do (Lua.create-table lua 0 0) (Lua.get-metatable lua -1))
     "get-metatable returns false when no metatable is set")
@@ -75,7 +71,6 @@
                      (Lua.get-metatable lua -1))
     "get-metatable returns true after set-metatable")
 
-  ; === new-metatable ===
   (assert-true test
     (Lua.with-lua-do (Lua.new-metatable lua (cstr "TestType")))
     "new-metatable returns true for a new name")
@@ -92,7 +87,6 @@
       (Lua.type-of lua -1))
     "new-metatable pushes a table onto the stack")
 
-  ; === set-named-metatable ===
   (assert-true test
     (Lua.with-lua-do
       (ignore (Lua.new-metatable lua (cstr "MyMT")))
@@ -102,7 +96,6 @@
       (Lua.get-metatable lua -1))
     "set-named-metatable attaches registry metatable")
 
-  ; === metatable with __index for method dispatch ===
   (assert-equal test
     10
     (Lua.with-lua-do (Lua.libs lua)
@@ -121,7 +114,6 @@
                      (Lua.get-int lua -1))
     "metatable __index enables method dispatch from Carp-created table")
 
-  ; === raw access bypasses metamethods ===
   (assert-equal test
     Lua.TYPE_NIL
     (Lua.with-lua-do (Lua.libs lua)
@@ -136,7 +128,6 @@
                      (Lua.raw-get lua -2))
     "raw-get bypasses __index metamethod")
 
-  ; === new-userdata ===
   (assert-equal test
     Lua.TYPE_USERDATA
     (Lua.with-lua-do (ignore (Lua.new-userdata lua 8)) (Lua.type-of lua -1))
@@ -146,7 +137,6 @@
                      (null? (Lua.get-user-data lua -1)))
     "new-userdata returns a non-null pointer")
 
-  ; === new-userdata with metatable ===
   (assert-true test
     (Lua.with-lua-do
       (ignore (Lua.new-metatable lua (cstr "Point")))
@@ -156,7 +146,6 @@
       (Lua.get-metatable lua -1))
     "userdata can have a metatable attached via set-named-metatable")
 
-  ; === test-userdata ===
   (assert-false test
     (Lua.with-lua-do
       (ignore (Lua.new-metatable lua (cstr "Vec")))
@@ -174,13 +163,11 @@
       (null? (Lua.test-userdata lua -1 (cstr "Other"))))
     "test-userdata returns null for non-matching metatable")
 
-  ; === TYPE_USERDATA / TYPE_LIGHTUSERDATA ===
   (assert-equal test
     Lua.TYPE_USERDATA
     (Lua.with-lua-do (ignore (Lua.new-userdata lua 4)) (Lua.type-of lua -1))
     "TYPE_USERDATA matches full userdata")
 
-  ; === maybe-get-userdata ===
   (assert-true test
     (Maybe.just?
       &(Lua.with-lua-do (ignore (Lua.new-userdata lua 8))
