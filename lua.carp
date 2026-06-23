@@ -90,7 +90,9 @@
         (doc %fn-name
           "Set field `name` to `value` on the table at `index`. Handles the stack index shift from pushing the value internally.")
         (defn %fn-name [lua index name value]
-          (do (%pusher lua value) (Lua.set-field lua (- index 1) (cstr name))))))))
+          (do
+            (%pusher lua value)
+            (Lua.set-field lua (if (< index 0) (- index 1) index) (cstr name))))))))
 
 (defmacro luax--def-get-field [suffix type-const getter article type-article]
   (let [fn-name (Symbol.concat ['get- suffix '-field])
@@ -416,7 +418,7 @@ stack unchanged.")
       (do
         (push-nil lua)
         (let-do [count 0]
-          (while-do (/= 0 (next lua (- index 1)))
+          (while-do (/= 0 (next lua (if (< index 0) (- index 1) index)))
             (set! count (+ count 1))
             (pop lua 1))
           count))))
@@ -780,9 +782,13 @@ call raises a Lua error.
             %@pushes
             (let [%result-sym (Lua.call %lua %nargs 1 0)]
               (if (= %result-sym Lua.OK)
-                (Result.Success (%getter %lua -1))
-                (Result.Error
-                  (String.from-cstr-or (Lua.to-string %lua -1) @"unknown error")))))))))
+                (let-do [res (%getter %lua -1)]
+                  (Lua.pop %lua 1)
+                  (Result.Success res))
+                (let-do [err (String.from-cstr-or (Lua.to-string %lua -1)
+                                                  @"unknown error")]
+                  (Lua.pop %lua 1)
+                  (Result.Error err)))))))))
 
   (doc make-table "Create a Lua table with the given fields and assign it to the
 global `name`. Each field spec is `(field-name (push-expr))`, where the `lua`
