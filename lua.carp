@@ -713,7 +713,12 @@ unchanged.")
   (luax--def-set-global int Lua.push-int)
   (luax--def-set-global float Lua.push-float)
   (luax--def-set-global bool Lua.push-bool)
-  (luax--def-set-global string Lua.push-carp-str)
+  ; `string` is defined explicitly rather than via luax--def-set-global: the
+  ; macro's eval-generated defn fails to bind when a sibling `Lua.set-string-global`
+  ; already exists. int/float/bool have no such name collision.
+  (doc set-string-global "Push `value` and assign it to the global `name`.")
+  (defn set-string-global [lua name value]
+    (do (Lua.push-carp-str lua value) (Lua.set-global lua (cstr name))))
 
   (luax--def-get-global int Lua.TYPE_NUMBER Lua.get-int "an integer" "a number")
   (luax--def-get-global float Lua.TYPE_NUMBER Lua.get-float "a float" "a number")
@@ -722,11 +727,17 @@ unchanged.")
                         Lua.get-bool
                         "a boolean"
                         "a boolean")
-  (luax--def-get-global string
-                        Lua.TYPE_STRING
-                        get-carp-str
-                        "a Carp `String`"
-                        "a string")
+  ; `string` defined explicitly for the same reason as set-string-global above.
+  (doc get-string-global
+    "Fetch the global `name` as a Carp `String`. Returns `Nothing` if the global is nil or not a string. Pops the global from the stack internally.")
+  (defn get-string-global [lua name]
+    (do
+      (Lua.get-global lua (cstr name))
+      (let-do [result (if (= (Lua.type-of lua -1) Lua.TYPE_STRING)
+                 (Maybe.Just (get-carp-str lua -1))
+                 (Maybe.Nothing))]
+        (Lua.pop lua 1)
+        result)))
 
   (luax--def-set-field int Lua.push-int)
   (luax--def-set-field float Lua.push-float)

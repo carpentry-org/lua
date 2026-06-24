@@ -69,10 +69,32 @@ replaces the function and arguments on the stack.</p>
 </code></pre>
 <p>Tables are built by creating an empty table with <a href="#create-table"><code>create-table</code></a>,
 setting fields with <a href="#set-field"><code>set-field</code></a>, and optionally assigning the
-table to a global with <a href="#set-global"><code>set-global</code></a>.</p>
+table to a global with <a href="#set-global"><code>set-global</code></a>. Raw table access
+(<a href="#raw-get"><code>raw-get</code></a>, <a href="#raw-set"><code>raw-set</code></a>, <a href="#raw-geti"><code>raw-geti</code></a>,
+<a href="#raw-seti"><code>raw-seti</code></a>) bypasses metamethods for direct table manipulation.</p>
+<p>Metatables enable object-oriented patterns and operator overloading. Use
+<a href="#new-metatable"><code>new-metatable</code></a> to create a named metatable in the registry,
+<a href="#set-metatable"><code>set-metatable</code></a> to attach it to a table or userdata, and
+<a href="#get-metatable"><code>get-metatable</code></a> to retrieve it.</p>
+<p>Full userdata (<a href="#new-userdata"><code>new-userdata</code></a>) allocates GC-managed memory on
+the Lua side, useful for exposing Carp-created objects to Lua scripts with
+metatables for method dispatch.</p>
 <p>The module also provides convenience macros: <a href="#fun"><code>fun</code></a> defines a Lua
-function from inline source, and <a href="#val"><code>val</code></a> evaluates a Lua expression into
-a global. For higher-level functions that handle type checking and error
+function from inline source, <a href="#val"><code>val</code></a> evaluates a Lua expression into
+a global, and <a href="#register-fn"><code>register-fn</code></a> registers a Carp function as a
+Lua global so that Lua scripts can call back into Carp:</p>
+<pre><code>(defn double-it [l]
+  (let [x (Lua.get-int l 1)]
+    (do (Lua.push-int l (* x 2)) 1)))
+
+(Lua.prepare-cfunction double-it)
+
+(Lua.with-lua-do
+  (Lua.libs lua)
+  (Lua.register-fn lua double double-it)
+  (ignore (Lua.do-string lua (cstr &quot;print(double(21))&quot;))))
+</code></pre>
+<p>For higher-level functions that handle type checking and error
 wrapping automatically, see <a href="#Luax"><code>Luax</code></a>.</p>
 
                 </div>
@@ -217,6 +239,26 @@ wrapping automatically, see <a href="#Luax"><code>Luax</code></a>.</p>
                     </p>
                 </div>
                 <div class="binder">
+                    <a class="anchor" href="#TYPE_LIGHTUSERDATA">
+                        <h3 id="TYPE_LIGHTUSERDATA">
+                            TYPE_LIGHTUSERDATA
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        Int
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Type constant for light userdata values.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
                     <a class="anchor" href="#TYPE_NIL">
                         <h3 id="TYPE_NIL">
                             TYPE_NIL
@@ -297,6 +339,26 @@ wrapping automatically, see <a href="#Luax"><code>Luax</code></a>.</p>
                     </p>
                 </div>
                 <div class="binder">
+                    <a class="anchor" href="#TYPE_USERDATA">
+                        <h3 id="TYPE_USERDATA">
+                            TYPE_USERDATA
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        Int
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Type constant for full userdata values.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
                     <a class="anchor" href="#call">
                         <h3 id="call">
                             call
@@ -316,6 +378,28 @@ wrapping automatically, see <a href="#Luax"><code>Luax</code></a>.</p>
 expected results. The last argument is the error handler stack index (0 for
 none). Returns a status code; use <a href="#call-fn"><code>Luax.call-fn</code></a> for a safer
 interface.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#check-userdata">
+                        <h3 id="check-userdata">
+                            check-userdata
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int, (Ptr CChar)] (Ptr ()))
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Return a pointer to the userdata at <code>index</code> if it has the
+metatable <code>name</code> from the registry. Raises a Lua error otherwise (catchable with
+<a href="#call"><code>call</code></a>).</p>
 
                     </p>
                 </div>
@@ -576,6 +660,28 @@ type—use <a href="#maybe-get-int"><code>Luax.maybe-get-int</code></a> for a sa
                     </p>
                 </div>
                 <div class="binder">
+                    <a class="anchor" href="#get-metatable">
+                        <h3 id="get-metatable">
+                            get-metatable
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int] Bool)
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Push the metatable of the value at <code>index</code> onto the stack.
+Returns <code>true</code> if the value has a metatable, <code>false</code> otherwise (and nothing is
+pushed).</p>
+
+                    </p>
+                </div>
+                <div class="binder">
                     <a class="anchor" href="#get-string">
                         <h3 id="get-string">
                             get-string
@@ -766,6 +872,52 @@ automatically.</p>
                     </p>
                 </div>
                 <div class="binder">
+                    <a class="anchor" href="#new-metatable">
+                        <h3 id="new-metatable">
+                            new-metatable
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), (Ptr CChar)] Bool)
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Create or look up a named metatable in the Lua registry and
+push it onto the stack. Returns <code>true</code> if a new table was created, <code>false</code> if
+the name already existed. Either way the metatable is on top of the stack
+afterward.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#new-userdata">
+                        <h3 id="new-userdata">
+                            new-userdata
+                        </h3>
+                    </a>
+                    <div class="description">
+                        instantiate
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int] (Ptr ()))
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Allocate <code>size</code> bytes as a full userdata, push it onto the
+stack, and return a pointer to the allocated block. The userdata is
+garbage-collected by Lua. Use <a href="#set-metatable"><code>set-metatable</code></a> or
+<a href="#set-named-metatable"><code>set-named-metatable</code></a> to attach a metatable.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
                     <a class="anchor" href="#next">
                         <h3 id="next">
                             next
@@ -808,6 +960,36 @@ with <a href="#push-nil"><code>push-nil</code></a> as the initial key.</p>
                     </p>
                 </div>
                 <div class="binder">
+                    <a class="anchor" href="#prepare-cfunction">
+                        <h3 id="prepare-cfunction">
+                            prepare-cfunction
+                        </h3>
+                    </a>
+                    <div class="description">
+                        macro
+                    </div>
+                    <p class="sig">
+                        Macro
+                    </p>
+                    <pre class="args">
+                        (prepare-cfunction fn-sym)
+                    </pre>
+                    <p class="doc">
+                        <p>Declare a Carp function as pushable onto a Lua stack.
+Must be called at the top level, before any use of
+<a href="#push-cfunction"><code>push-cfunction</code></a> or <a href="#register-fn"><code>register-fn</code></a> with this
+function. The function must be a top-level <code>defn</code> with signature
+<code>(Fn [&amp;Lua] Int)</code>.</p>
+<pre><code>(defn square [l]
+  (let [x (Lua.get-int l 1)]
+    (do (Lua.push-int l (* x x)) 1)))
+
+(Lua.prepare-cfunction square)
+</code></pre>
+
+                    </p>
+                </div>
+                <div class="binder">
                     <a class="anchor" href="#push-bool">
                         <h3 id="push-bool">
                             push-bool
@@ -845,6 +1027,38 @@ with <a href="#push-nil"><code>push-nil</code></a> as the initial key.</p>
                     <p class="doc">
                         <p>Push a Carp <code>String</code> reference onto the Lua stack. Wraps
 <a href="#push-string"><code>push-string</code></a> with automatic <code>cstr</code> conversion.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#push-cfunction">
+                        <h3 id="push-cfunction">
+                            push-cfunction
+                        </h3>
+                    </a>
+                    <div class="description">
+                        macro
+                    </div>
+                    <p class="sig">
+                        Macro
+                    </p>
+                    <pre class="args">
+                        (push-cfunction lua fn-sym)
+                    </pre>
+                    <p class="doc">
+                        <p>Push a prepared Carp function onto the Lua stack as a
+C function. The function must have been declared with
+<a href="#prepare-cfunction"><code>prepare-cfunction</code></a> at the top level first.</p>
+<pre><code>(defn square [l]
+  (let [x (Lua.get-int l 1)]
+    (do (Lua.push-int l (* x x)) 1)))
+
+(Lua.prepare-cfunction square)
+
+(Lua.with-lua-do
+  (Lua.push-cfunction lua square)
+  (Lua.set-global lua (cstr &quot;square&quot;)))
+</code></pre>
 
                     </p>
                 </div>
@@ -1010,6 +1224,149 @@ with <a href="#push-nil"><code>push-nil</code></a> as the initial key.</p>
                     </p>
                 </div>
                 <div class="binder">
+                    <a class="anchor" href="#raw-get">
+                        <h3 id="raw-get">
+                            raw-get
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int] Int)
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Like <a href="#get-table"><code>get-table</code></a> but bypasses metamethods. Pops the
+key from the stack and pushes the value. Returns the type of the result.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#raw-geti">
+                        <h3 id="raw-geti">
+                            raw-geti
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int, Int] Int)
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Push <code>t[n]</code> onto the stack without invoking metamethods, where <code>t</code>
+is the table at <code>index</code>. Returns the type of the result.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#raw-len">
+                        <h3 id="raw-len">
+                            raw-len
+                        </h3>
+                    </a>
+                    <div class="description">
+                        instantiate
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int] Int)
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Return the raw length of the value at <code>index</code> (table, string, or
+full userdata) without invoking the <code>__len</code> metamethod.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#raw-set">
+                        <h3 id="raw-set">
+                            raw-set
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int] ())
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Like <a href="#set-table"><code>set-table</code></a> but bypasses metamethods. Pops both
+the key and the value from the stack.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#raw-seti">
+                        <h3 id="raw-seti">
+                            raw-seti
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int, Int] ())
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Pop the top value and set it as <code>t[n]</code> without invoking
+metamethods, where <code>t</code> is the table at <code>index</code>.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#register-fn">
+                        <h3 id="register-fn">
+                            register-fn
+                        </h3>
+                    </a>
+                    <div class="description">
+                        macro
+                    </div>
+                    <p class="sig">
+                        Macro
+                    </p>
+                    <pre class="args">
+                        (register-fn lua name fn-sym)
+                    </pre>
+                    <p class="doc">
+                        <p>Register a Carp function as a Lua global, making it callable
+from Lua scripts. The function must have been declared with
+<a href="#prepare-cfunction"><code>prepare-cfunction</code></a> at the top level first. <code>name</code> is the
+Lua-side name (a symbol).</p>
+<p>The function must be a top-level <code>defn</code> with signature <code>(Fn [&amp;Lua] Int)</code>:
+it receives arguments via the Lua stack (1-indexed from the bottom) and
+must return the number of results pushed.</p>
+<pre><code>(defn my-add [l]
+  (let [a (Lua.get-int l 1)
+        b (Lua.get-int l 2)]
+    (do (Lua.push-int l (+ a b)) 1)))
+
+(Lua.prepare-cfunction my-add)
+
+(Lua.with-lua-do
+  (Lua.libs lua)
+  (Lua.register-fn lua add my-add)
+  (ignore (Lua.do-string lua (cstr &quot;print(add(3, 4))&quot;))))
+</code></pre>
+
+                    </p>
+                </div>
+                <div class="binder">
                     <a class="anchor" href="#set-field">
                         <h3 id="set-field">
                             set-field
@@ -1049,6 +1406,49 @@ and friends for a safer interface.</p>
                     </span>
                     <p class="doc">
                         <p>Pop the top value from the stack and set it as the named global.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#set-metatable">
+                        <h3 id="set-metatable">
+                            set-metatable
+                        </h3>
+                    </a>
+                    <div class="description">
+                        instantiate
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int] ())
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Pop the table from the top of the stack and set it as the
+metatable for the value at <code>index</code>.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#set-named-metatable">
+                        <h3 id="set-named-metatable">
+                            set-named-metatable
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), (Ptr CChar)] ())
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Set the metatable of the value on top of the stack to
+the metatable associated with <code>name</code> in the registry. The value remains on the
+stack.</p>
 
                     </p>
                 </div>
@@ -1135,6 +1535,27 @@ library name for linking (defaults to <code>&quot;lua&quot;</code>).</p>
                         <p>Count the entries in the table at <code>index</code> by iterating with
 <a href="#next"><code>next</code></a>. Returns -1 if the value at <code>index</code> is not a table. Leaves the
 stack unchanged.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#test-userdata">
+                        <h3 id="test-userdata">
+                            test-userdata
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int, (Ptr CChar)] (Ptr ()))
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Like <a href="#check-userdata"><code>check-userdata</code></a> but returns a null
+pointer instead of raising a Lua error when the check fails.</p>
 
                     </p>
                 </div>
