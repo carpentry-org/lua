@@ -1,0 +1,331 @@
+(load "../lua.carp")
+(load "Test.carp")
+(use Test)
+
+(add-cflag "-I/opt/homebrew/include")
+(add-cflag "-L/opt/homebrew/lib")
+(Lua.setup "lua")
+
+; === C function that yields a value (tail-call yield) ===
+
+(defn yield-value [l]
+  (let-do [x (Lua.get-int l 1)] (Lua.push-int l (* x 10)) (Lua.yield l 1)))
+
+(Lua.prepare-cfunction yield-value)
+
+; === C function that returns without yielding ===
+
+(defn no-yield [l] (do (Lua.push-int l 42) 1))
+
+(Lua.prepare-cfunction no-yield)
+
+(deftest test
+  ; === YIELD constant ===
+  (assert-true test (/= Lua.OK Lua.YIELD) "YIELD is distinct from OK")
+
+  ; === TYPE_THREAD constant ===
+  (assert-equal test
+    Lua.TYPE_THREAD
+    (Lua.with-lua-do (ignore (Lua.new-thread lua)) (Lua.type-of lua -1))
+    "new-thread pushes a thread value")
+
+  ; === new-thread ===
+  (assert-equal test
+    1
+    (Lua.with-lua-do (ignore (Lua.new-thread lua)) (Lua.get-top lua))
+    "new-thread pushes exactly one value onto the parent stack")
+
+  ; === coroutine-status on fresh thread ===
+  (assert-equal test
+    Lua.OK
+    (Lua.with-lua-do (let [co (Lua.new-thread lua)] (Lua.coroutine-status co)))
+    "fresh coroutine has status OK")
+
+  ; === to-thread ===
+  (assert-equal test
+    Lua.TYPE_THREAD
+    (Lua.with-lua-do
+      (let-do [co (Lua.new-thread lua)]
+        (Lua.push-int co 42)
+        (Lua.type-of lua -1)))
+    "to-thread: thread on parent stack is accessible")
+
+  ; === Lua-defined coroutine: basic resume/yield ===
+  (assert-equal test
+    1
+    (Lua.with-lua-do (Lua.libs lua)
+                     (ignore
+                       (Lua.do-string lua
+                                      (cstr
+                                        "function counter() coroutine.yield(1); coroutine.yield(2); return 3 end")))
+                     (let-do [co (Lua.new-thread lua)]
+                       (Lua.get-global co (cstr "counter"))
+                       (ignore (Lua.resume co lua 0))
+                       (Lua.get-int co -1)))
+    "first yield produces 1")
+
+  (assert-equal test
+    2
+    (Lua.with-lua-do (Lua.libs lua)
+                     (ignore
+                       (Lua.do-string lua
+                                      (cstr
+                                        "function counter() coroutine.yield(1); coroutine.yield(2); return 3 end")))
+                     (let-do [co (Lua.new-thread lua)]
+                       (Lua.get-global co (cstr "counter"))
+                       (ignore (Lua.resume co lua 0))
+                       (Lua.pop co 1)
+                       (ignore (Lua.resume co lua 0))
+                       (Lua.get-int co -1)))
+    "second yield produces 2")
+
+  (assert-equal test
+    3
+    (Lua.with-lua-do (Lua.libs lua)
+                     (ignore
+                       (Lua.do-string lua
+                                      (cstr
+                                        "function counter() coroutine.yield(1); coroutine.yield(2); return 3 end")))
+                     (let-do [co (Lua.new-thread lua)]
+                       (Lua.get-global co (cstr "counter"))
+                       (ignore (Lua.resume co lua 0))
+                       (Lua.pop co 1)
+                       (ignore (Lua.resume co lua 0))
+                       (Lua.pop co 1)
+                       (ignore (Lua.resume co lua 0))
+                       (Lua.get-int co -1)))
+    "final return produces 3")
+
+  ; === resume status codes ===
+  (assert-equal test
+    Lua.YIELD
+    (Lua.with-lua-do (Lua.libs lua)
+                     (ignore
+                       (Lua.do-string lua
+                                      (cstr
+                                        "function yielder() coroutine.yield() end")))
+                     (let-do [co (Lua.new-thread lua)]
+                       (Lua.get-global co (cstr "yielder"))
+                       (Lua.resume co lua 0)))
+    "resume returns YIELD when coroutine suspends")
+
+  (assert-equal test
+    Lua.OK
+    (Lua.with-lua-do (Lua.libs lua)
+                     (ignore
+                       (Lua.do-string lua
+                                      (cstr
+                                        "function yielder() coroutine.yield() end")))
+                     (let-do [co (Lua.new-thread lua)]
+                       (Lua.get-global co (cstr "yielder"))
+                       (ignore (Lua.resume co lua 0))
+                       (Lua.resume co lua 0)))
+    "resume returns OK when coroutine finishes")
+
+  ; === coroutine-status reflects yield/finish ===
+  (assert-true test
+    (Lua.with-lua-do (Lua.libs lua)
+                     (ignore
+                       (Lua.do-string lua
+                                      (cstr
+                                        "function yielder() coroutine.yield() end")))
+                     (let-do [co (Lua.new-thread lua)]
+                       (Lua.get-global co (cstr "yielder"))
+                       (ignore (Lua.resume co lua 0))
+                       (Luax.coroutine-suspended? co)))
+    "coroutine-suspended? returns true after yield")
+
+  (assert-true test
+    (Lua.with-lua-do (Lua.libs lua)
+                     (ignore
+                       (Lua.do-string lua
+                                      (cstr
+                                        "function yielder() coroutine.yield() end")))
+                     (let-do [co (Lua.new-thread lua)]
+                       (Lua.get-global co (cstr "yielder"))
+                       (ignore (Lua.resume co lua 0))
+                       (ignore (Lua.resume co lua 0))
+                       (Luax.coroutine-finished? co)))
+    "coroutine-finished? returns true after coroutine completes")
+
+  ; === passing values into resume ===
+  (assert-equal test
+    42
+    (Lua.with-lua-do (Lua.libs lua)
+                     (ignore
+                       (Lua.do-string lua
+                                      (cstr
+                                        "function echo() local x = coroutine.yield(); return x end")))
+                     (let-do [co (Lua.new-thread lua)]
+                       (Lua.get-global co (cstr "echo"))
+                       (ignore (Lua.resume co lua 0))
+                       (Lua.pop co (Lua.get-top co))
+                       (Lua.push-int co 42)
+                       (ignore (Lua.resume co lua 1))
+                       (Lua.get-int co -1)))
+    "values pushed before resume are received by yield")
+
+  ; === coroutine error handling ===
+  (assert-true test
+    (/= Lua.OK
+        (Lua.with-lua-do (Lua.libs lua)
+                         (ignore
+                           (Lua.do-string lua
+                                          (cstr "function bad_co() error('oops') end")))
+                         (let-do [co (Lua.new-thread lua)]
+                           (Lua.get-global co (cstr "bad_co"))
+                           (Lua.resume co lua 0))))
+    "resume returns error code when coroutine errors")
+
+  ; === C function coroutine with tail-call yield ===
+  (assert-equal test
+    Lua.YIELD
+    (Lua.with-lua-do (Lua.libs lua)
+                     (let-do [co (Lua.new-thread lua)]
+                       (Lua.push-cfunction co yield-value)
+                       (Lua.push-int co 5)
+                       (Lua.resume co lua 1)))
+    "C function coroutine: resume returns YIELD")
+
+  (assert-equal test
+    50
+    (Lua.with-lua-do (Lua.libs lua)
+                     (let-do [co (Lua.new-thread lua)]
+                       (Lua.push-cfunction co yield-value)
+                       (Lua.push-int co 5)
+                       (ignore (Lua.resume co lua 1))
+                       (Lua.get-int co -1)))
+    "C function coroutine: yielded value is correct")
+
+  ; === C function coroutine that returns without yielding ===
+  (assert-equal test
+    Lua.OK
+    (Lua.with-lua-do (Lua.libs lua)
+                     (let-do [co (Lua.new-thread lua)]
+                       (Lua.push-cfunction co no-yield)
+                       (Lua.resume co lua 0)))
+    "C function coroutine: returns OK when function does not yield")
+
+  (assert-equal test
+    42
+    (Lua.with-lua-do (Lua.libs lua)
+                     (let-do [co (Lua.new-thread lua)]
+                       (Lua.push-cfunction co no-yield)
+                       (ignore (Lua.resume co lua 0))
+                       (Lua.get-int co -1)))
+    "C function coroutine: return value accessible after resume")
+
+  ; === Luax.resume-coroutine ===
+  (assert-true test
+    (= &(Result.Success Lua.YIELD)
+       &(Lua.with-lua-do (Lua.libs lua)
+                         (ignore
+                           (Lua.do-string lua
+                                          (cstr
+                                            "function yielder() coroutine.yield(1) end")))
+                         (let-do [co (Lua.new-thread lua)]
+                           (Lua.get-global co (cstr "yielder"))
+                           (Luax.resume-coroutine co lua 0))))
+    "resume-coroutine returns Success YIELD on suspend")
+
+  (assert-true test
+    (= &(Result.Success Lua.OK)
+       &(Lua.with-lua-do (Lua.libs lua)
+                         (ignore
+                           (Lua.do-string lua
+                                          (cstr
+                                            "function yielder() coroutine.yield(1) end")))
+                         (let-do [co (Lua.new-thread lua)]
+                           (Lua.get-global co (cstr "yielder"))
+                           (ignore (Luax.resume-coroutine co lua 0))
+                           (Lua.pop co 1)
+                           (Luax.resume-coroutine co lua 0))))
+    "resume-coroutine returns Success OK on finish")
+
+  (assert-true test
+    (Result.error?
+      &(Lua.with-lua-do (Lua.libs lua)
+                        (ignore
+                          (Lua.do-string lua
+                                         (cstr "function bad() error('boom') end")))
+                        (let-do [co (Lua.new-thread lua)]
+                          (Lua.get-global co (cstr "bad"))
+                          (Luax.resume-coroutine co lua 0))))
+    "resume-coroutine returns Error on coroutine error")
+
+  ; === yields with string values ===
+  (assert-true test
+    (= @"a"
+       (Lua.with-lua-do (Lua.libs lua)
+                        (ignore
+                          (Lua.do-string lua
+                                         (cstr
+                                           "function letters() coroutine.yield('a'); coroutine.yield('b'); return 'c' end")))
+                        (let-do [co (Lua.new-thread lua)]
+                          (Lua.get-global co (cstr "letters"))
+                          (ignore (Lua.resume co lua 0))
+                          (String.from-cstr-or (Lua.to-string co -1) @""))))
+    "coroutine yields string value on first resume")
+  (assert-true test
+    (= @"c"
+       (Lua.with-lua-do (Lua.libs lua)
+                        (ignore
+                          (Lua.do-string lua
+                                         (cstr
+                                           "function letters() coroutine.yield('a'); coroutine.yield('b'); return 'c' end")))
+                        (let-do [co (Lua.new-thread lua)]
+                          (Lua.get-global co (cstr "letters"))
+                          (ignore (Lua.resume co lua 0))
+                          (Lua.pop co 1)
+                          (ignore (Lua.resume co lua 0))
+                          (Lua.pop co 1)
+                          (ignore (Lua.resume co lua 0))
+                          (String.from-cstr-or (Lua.to-string co -1) @""))))
+    "coroutine returns string value on final resume")
+
+  ; === multiple coroutines ===
+  (assert-equal test
+    2
+    (Lua.with-lua-do (Lua.libs lua)
+                     (ignore
+                       (Lua.do-string lua
+                                      (cstr
+                                        "function inc(start) local i = start; while true do coroutine.yield(i); i = i + 1 end end")))
+                     (let-do [co1 (Lua.new-thread lua)
+                              co2 (Lua.new-thread lua)]
+                       (Lua.get-global co1 (cstr "inc"))
+                       (Lua.push-int co1 1)
+                       (Lua.get-global co2 (cstr "inc"))
+                       (Lua.push-int co2 100)
+                       ; first resume: co1 yields 1, co2 yields 100
+                       (ignore (Lua.resume co1 lua 1))
+                       (ignore (Lua.resume co2 lua 1))
+                       (Lua.pop co1 1)
+                       (Lua.pop co2 1)
+                       ; second resume: co1 yields 2, co2 yields 101
+                       (ignore (Lua.resume co1 lua 0))
+                       (ignore (Lua.resume co2 lua 0))
+                       (Lua.get-int co1 -1)))
+    "two independent coroutines maintain separate state")
+
+  (assert-equal test
+    101
+    (Lua.with-lua-do (Lua.libs lua)
+                     (ignore
+                       (Lua.do-string lua
+                                      (cstr
+                                        "function inc(start) local i = start; while true do coroutine.yield(i); i = i + 1 end end")))
+                     (let-do [co1 (Lua.new-thread lua)
+                              co2 (Lua.new-thread lua)]
+                       (Lua.get-global co1 (cstr "inc"))
+                       (Lua.push-int co1 1)
+                       (Lua.get-global co2 (cstr "inc"))
+                       (Lua.push-int co2 100)
+                       (ignore (Lua.resume co1 lua 1))
+                       (ignore (Lua.resume co2 lua 1))
+                       (Lua.pop co1 1)
+                       (Lua.pop co2 1)
+                       (ignore (Lua.resume co1 lua 0))
+                       (ignore (Lua.resume co2 lua 0))
+                       (Lua.get-int co2 -1)))
+    "second coroutine counts independently from first"))
