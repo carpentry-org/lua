@@ -41,6 +41,7 @@ jobs:
           carp -x test/midlevel.carp
           carp -x test/cfunction.carp
           carp -x test/metatable.carp
+          carp -x test/coroutine.carp
 
       - name: Install angler
         run: |
