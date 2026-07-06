@@ -79,6 +79,26 @@ table to a global with <a href="#set-global"><code>set-global</code></a>. Raw ta
 <p>Full userdata (<a href="#new-userdata"><code>new-userdata</code></a>) allocates GC-managed memory on
 the Lua side, useful for exposing Carp-created objects to Lua scripts with
 metatables for method dispatch.</p>
+<p>Coroutines are created with <a href="#new-thread"><code>new-thread</code></a>, which returns a new
+execution context sharing the parent’s globals. Push a function onto the
+coroutine’s stack, then drive it with <a href="#resume"><code>resume</code></a>. The coroutine
+yields values back via <code>coroutine.yield()</code> (Lua side) or <a href="#yield"><code>yield</code></a>
+(C function side, tail-call only). Check <a href="#coroutine-status"><code>coroutine-status</code></a>
+or the return value of <code>resume</code> (<a href="#OK"><code>OK</code></a> vs <a href="#YIELD"><code>YIELD</code></a>) to
+distinguish completion from suspension.</p>
+<pre><code>(Lua.with-lua-do
+  (Lua.libs lua)
+  (ignore (Lua.do-string lua
+    (cstr &quot;function gen() coroutine.yield(1); return 2 end&quot;)))
+  (let [co (Lua.new-thread lua)]
+    (do
+      (Lua.get-global co (cstr &quot;gen&quot;))
+      (ignore (Lua.resume co lua 0))       ; yields 1
+      (IO.println &amp;(str (Lua.get-int co -1)))
+      (Lua.pop co 1)
+      (ignore (Lua.resume co lua 0))       ; returns 2
+      (IO.println &amp;(str (Lua.get-int co -1))))))
+</code></pre>
 <p>The module also provides convenience macros: <a href="#fun"><code>fun</code></a> defines a Lua
 function from inline source, <a href="#val"><code>val</code></a> evaluates a Lua expression into
 a global, and <a href="#register-fn"><code>register-fn</code></a> registers a Carp function as a
@@ -339,6 +359,26 @@ wrapping automatically, see <a href="#Luax"><code>Luax</code></a>.</p>
                     </p>
                 </div>
                 <div class="binder">
+                    <a class="anchor" href="#TYPE_THREAD">
+                        <h3 id="TYPE_THREAD">
+                            TYPE_THREAD
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        Int
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Type constant for thread (coroutine) values.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
                     <a class="anchor" href="#TYPE_USERDATA">
                         <h3 id="TYPE_USERDATA">
                             TYPE_USERDATA
@@ -355,6 +395,26 @@ wrapping automatically, see <a href="#Luax"><code>Luax</code></a>.</p>
                     </span>
                     <p class="doc">
                         <p>Type constant for full userdata values.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#YIELD">
+                        <h3 id="YIELD">
+                            YIELD
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        Int
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Status code returned when a coroutine yields.</p>
 
                     </p>
                 </div>
@@ -420,6 +480,28 @@ metatable <code>name</code> from the registry. Raises a Lua error otherwise (cat
                     </span>
                     <p class="doc">
                         <p>Close a Lua state and free all associated resources.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#coroutine-status">
+                        <h3 id="coroutine-status">
+                            coroutine-status
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a)] Int)
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Return the status of a coroutine: <a href="#OK"><code>OK</code></a> if the
+coroutine has not started or finished successfully, <a href="#YIELD"><code>YIELD</code></a> if it is
+suspended, or an error code if it terminated with an error.</p>
 
                     </p>
                 </div>
@@ -809,6 +891,26 @@ Pushes and pops internally, leaving the stack unchanged.</p>
                     </p>
                 </div>
                 <div class="binder">
+                    <a class="anchor" href="#is-yieldable?">
+                        <h3 id="is-yieldable?">
+                            is-yieldable?
+                        </h3>
+                    </a>
+                    <div class="description">
+                        instantiate
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a)] Bool)
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Return <code>true</code> if the given coroutine can yield.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
                     <a class="anchor" href="#libs">
                         <h3 id="libs">
                             libs
@@ -891,6 +993,30 @@ automatically.</p>
 push it onto the stack. Returns <code>true</code> if a new table was created, <code>false</code> if
 the name already existed. Either way the metatable is on top of the stack
 afterward.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#new-thread">
+                        <h3 id="new-thread">
+                            new-thread
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a)] (Ref Lua b))
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Create a new coroutine as a thread of the given state. Pushes
+the new thread onto the stack and returns a pointer to it. The coroutine shares
+the global environment with the parent but has its own execution stack. Do not
+call <a href="#close"><code>close</code></a> on the returned thread—it is garbage-collected by the
+parent state.</p>
 
                     </p>
                 </div>
@@ -1367,6 +1493,31 @@ must return the number of results pushed.</p>
                     </p>
                 </div>
                 <div class="binder">
+                    <a class="anchor" href="#resume">
+                        <h3 id="resume">
+                            resume
+                        </h3>
+                    </a>
+                    <div class="description">
+                        instantiate
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), (Ref Lua b), Int] Int)
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Resume a suspended coroutine. Before the first resume, push the
+function to call onto the coroutine’s stack; on subsequent resumes, push values
+to return from <a href="#yield"><code>yield</code></a>. <code>nargs</code> is the number of values pushed.
+<code>from</code> is the calling state. Returns <a href="#OK"><code>OK</code></a> when the coroutine finishes,
+<a href="#YIELD"><code>YIELD</code></a> when it suspends, or an error code. Results are left on the
+coroutine’s stack.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
                     <a class="anchor" href="#set-field">
                         <h3 id="set-field">
                             set-field
@@ -1581,6 +1732,27 @@ alias; prefer <a href="#get-carp-str"><code>Luax.get-carp-str</code></a>.</p>
                     </p>
                 </div>
                 <div class="binder">
+                    <a class="anchor" href="#to-thread">
+                        <h3 id="to-thread">
+                            to-thread
+                        </h3>
+                    </a>
+                    <div class="description">
+                        instantiate
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int] (Ref Lua b))
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Read the value at <code>index</code> as a <code>Lua</code> state pointer. Returns a
+null pointer if the value is not a thread.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
                     <a class="anchor" href="#type-of">
                         <h3 id="type-of">
                             type-of
@@ -1691,6 +1863,28 @@ in a <code>do</code> block. This is the most common entry point.</p>
   (Lua.push-int lua 42)
   (IO.println &amp;(str (Lua.get-int lua -1))))
 </code></pre>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#yield">
+                        <h3 id="yield">
+                            yield
+                        </h3>
+                    </a>
+                    <div class="description">
+                        instantiate
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int] Int)
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Yield the current coroutine with <code>nresults</code> values from the top of
+the stack. Can only be used as the return expression of a C function registered
+with <a href="#prepare-cfunction"><code>prepare-cfunction</code></a>.</p>
 
                     </p>
                 </div>

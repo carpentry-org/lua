@@ -94,6 +94,19 @@ and assigns it to a global in one expression:</p>
   (Result.Success _) ()
   (Result.Error e) (IO.println &amp;(fmt &quot;caught: %s&quot; &amp;e)))
 </code></pre>
+<p><strong>Coroutines.</strong> <a href="#resume-coroutine"><code>resume-coroutine</code></a> wraps
+<a href="#resume"><code>Lua.resume</code></a> with <code>Result</code> error handling, and
+<a href="#coroutine-suspended?"><code>coroutine-suspended?</code></a> /
+<a href="#coroutine-finished?"><code>coroutine-finished?</code></a> provide status predicates:</p>
+<pre><code>(let [co (Lua.new-thread lua)]
+  (do
+    (Lua.get-global co (cstr &quot;gen&quot;))
+    (match (Luax.resume-coroutine co lua 0)
+      (Result.Success status)
+        (when (= status Lua.YIELD)
+          (IO.println &amp;(str (Lua.get-int co -1))))
+      (Result.Error e) (IO.errorln &amp;e))))
+</code></pre>
 
                 </div>
                 <div class="binder">
@@ -120,6 +133,46 @@ call raises a Lua error.</p>
   (Lua.push-int 3)
   (Lua.push-int 4))
 </code></pre>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#coroutine-finished?">
+                        <h3 id="coroutine-finished?">
+                            coroutine-finished?
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a)] Bool)
+                    </p>
+                    <pre class="args">
+                        (coroutine-finished? co)
+                    </pre>
+                    <p class="doc">
+                        <p>Return <code>true</code> if the coroutine has finished or has not yet started.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#coroutine-suspended?">
+                        <h3 id="coroutine-suspended?">
+                            coroutine-suspended?
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a)] Bool)
+                    </p>
+                    <pre class="args">
+                        (coroutine-suspended? co)
+                    </pre>
+                    <p class="doc">
+                        <p>Return <code>true</code> if the coroutine is suspended (has yielded).</p>
 
                     </p>
                 </div>
@@ -231,6 +284,30 @@ state argument is inserted into the push expression automatically.</p>
                         <p>Read the value at <code>index</code> as a userdata pointer,
 returning <code>Nothing</code> if it is not a full or light userdata. Leaves the stack
 unchanged.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#resume-coroutine">
+                        <h3 id="resume-coroutine">
+                            resume-coroutine
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), (Ref Lua b), Int] (Result Int String))
+                    </p>
+                    <pre class="args">
+                        (resume-coroutine co from nargs)
+                    </pre>
+                    <p class="doc">
+                        <p>Resume the coroutine <code>co</code> from state <code>from</code> with <code>nargs</code>
+arguments already pushed onto <code>co</code>’s stack. Returns <code>(Success status)</code> where
+<code>status</code> is <a href="#OK"><code>OK</code></a> (coroutine finished) or <a href="#YIELD"><code>YIELD</code></a> (coroutine
+suspended), or <code>(Error msg)</code> if the coroutine raised an error. Results or
+yielded values are left on <code>co</code>’s stack.</p>
 
                     </p>
                 </div>
