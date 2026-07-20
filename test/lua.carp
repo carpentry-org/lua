@@ -383,4 +383,55 @@
                      (Lua.push-int lua 22)
                      (ignore (Lua.call lua 2 1 0))
                      (Lua.get-int lua -1))
-    "functions loaded via do-file are callable from Carp"))
+    "functions loaded via do-file are callable from Carp")
+
+  (assert-equal test
+    0
+    (Lua.with-lua-do (Lua.libs lua)
+                     (Lua.set-string-global lua "s" "value")
+                     (for [i 0 30] (ignore (Lua.get-string-global lua "s")))
+                     (Lua.get-top lua))
+    "get-string-global leaves the stack unchanged")
+  (assert-equal test
+    0
+    (Lua.with-lua-do (Lua.libs lua)
+                     (for [i 0 30] (ignore (Lua.get-string-global lua "nope")))
+                     (Lua.get-top lua))
+    "get-string-global leaves the stack unchanged for undefined globals")
+  (assert-equal test
+    0
+    (Lua.with-lua-do (Lua.libs lua)
+                     (for [i 0 20] (ignore (Lua.val lua "x" "42")))
+                     (Lua.get-top lua))
+    "val leaves the stack unchanged")
+  (assert-equal test
+    0
+    (Lua.with-lua-do (Lua.libs lua)
+                     (for [i 0 20] (ignore (Lua.val lua "x" "bad$$syntax")))
+                     (Lua.get-top lua))
+    "val leaves the stack unchanged after failed calls")
+  (assert-equal test
+    0
+    (Lua.with-lua-do (Lua.libs lua)
+                     (for [i 0 20] (ignore (Lua.eval-file lua "test/test.lua")))
+                     (Lua.get-top lua))
+    "eval-file leaves the stack unchanged")
+  (assert-equal test
+    0
+    (Lua.with-lua-do (Lua.libs lua)
+                     (for [i 0 20]
+                       (ignore (Lua.eval-file lua "test/nonexistent.lua")))
+                     (Lua.get-top lua))
+    "eval-file leaves the stack unchanged after failed calls")
+  (assert-equal test
+    0
+    (Lua.with-lua-do (Lua.libs lua)
+                     (for [i 0 20] (ignore (Luax.do-in lua "x = 42")))
+                     (Lua.get-top lua))
+    "do-in leaves the stack unchanged")
+  (assert-equal test
+    0
+    (Lua.with-lua-do (Lua.libs lua)
+                     (for [i 0 20] (ignore (Luax.do-in lua "bad$$syntax")))
+                     (Lua.get-top lua))
+    "do-in leaves the stack unchanged after failed calls"))
