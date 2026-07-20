@@ -430,12 +430,15 @@ types, see [`Luax.set-int-global`](#set-int-global) and friends.")
     (do (push-carp-str lua s) (set-global lua (cstr name))))
 
   (doc get-string-global "Fetch the global `name` and return it as a Carp
-`String`. Returns an empty string if the global is nil or not a string. For a
-safe version returning `Maybe`, see [`Luax.get-string-global`](#get-string-global).")
+`String`. Returns an empty string if the global is nil or not a string. Pops the
+global from the stack internally. For a safe version returning `Maybe`, see
+[`Luax.get-string-global`](#get-string-global).")
   (defn get-string-global [lua name]
     (do
       (get-global lua (cstr name))
-      (String.from-cstr-or (to-string lua -1) @"")))
+      (let-do [result (String.from-cstr-or (to-string lua -1) @"")]
+        (pop lua 1)
+        result)))
 
   (doc global-exists? "Check whether the global `name` is defined (non-nil).
 Pushes and pops internally, leaving the stack unchanged.")
@@ -446,13 +449,16 @@ Pushes and pops internally, leaving the stack unchanged.")
 
   (doc eval-file
     "Load and execute the Lua file at `path`. Returns `(Success \"\")`
-on success or `(Error msg)` with the Lua error message on failure.")
+on success or `(Error msg)` with the Lua error message on failure. Leaves the
+stack unchanged in both cases.")
   (sig eval-file (Fn [&Lua &String] (Result String String)))
   (defn eval-file [lua path]
     (let [res (do-file lua (cstr path))]
       (if (= res OK)
         (Result.Success @"")
-        (Result.Error (String.from-cstr-or (to-string lua -1) @"unknown error")))))
+        (let-do [err (String.from-cstr-or (to-string lua -1) @"unknown error")]
+          (pop lua 1)
+          (Result.Error err)))))
 
   (doc table-length "Count the entries in the table at `index` by iterating with
 [`next`](#next). Returns -1 if the value at `index` is not a table. Leaves the
@@ -469,14 +475,17 @@ stack unchanged.")
           count))))
 
   (doc val "Evaluate the Lua expression `value` and assign the result to the
-global `name`. Returns `OK` on success.
+global `name`. Returns `OK` on success. On failure the Lua error object is
+discarded, leaving the stack unchanged; use [`Luax.do-in`](#do-in) if you need
+the message.
 
 ```
 (Lua.val lua \"pi\" \"3.14159\")
 ```")
   (defn val [lua name value]
-    (let [res (Lua.do-string lua (cstr &(fmt "return %s" value)))]
-      (if (= res Lua.OK) (do (Lua.set-global lua (cstr name)) res) res)))
+    (let-do [res (Lua.do-string lua (cstr &(fmt "return %s" value)))]
+      (if (= res Lua.OK) (Lua.set-global lua (cstr name)) (Lua.pop lua 1))
+      res))
 
   (doc fun "Define a Lua function from a Carp macro call. `name` becomes a Lua
 global, `args` is a list of parameter names, and `body` is the Lua source.
@@ -844,14 +853,17 @@ unchanged.")
   (doc do-in
     "Compile and execute the Lua string `code`. Returns `(Success \"\")`
 on success or `(Error msg)` with the Lua error message on failure. Wraps
-[`Lua.do-string`](#do-string) with `Result` handling.")
+[`Lua.do-string`](#do-string) with `Result` handling, leaving the stack
+unchanged in both cases.")
   (sig do-in (Fn [&Lua &String] (Result String String)))
   (defn do-in [lua code]
     (let [res (Lua.do-string lua (cstr code))]
       (if (= res Lua.OK)
         (Result.Success @"")
-        (Result.Error
-          (String.from-cstr-or (Lua.to-string lua -1) @"unknown error")))))
+        (let-do [err (String.from-cstr-or (Lua.to-string lua -1)
+                                          @"unknown error")]
+          (Lua.pop lua 1)
+          (Result.Error err)))))
 
   (doc call-fn "Call the Lua function `name` and read the result with `getter`.
 Arguments are passed as push expressions—the `lua` state argument is inserted
