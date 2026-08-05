@@ -49,7 +49,8 @@ A Lua number is a C double, so `push-double` and `get-double` (and the matching
 precision. The `float` versions still work — a float widens into a double
 exactly — but `get-float` narrows on the way back, so reading through it drops
 everything past single precision. Lua integers are a separate 64-bit subtype;
-`get-double` converts them to doubles, so integers above 2^53 come back rounded.
+`get-double` converts them to doubles, so integers above 2^53 are no longer all
+exactly representable and may come back rounded.
 
 The `Luax` module provides safe wrappers that return `Maybe` and `Result`
 types instead of requiring manual type checks:
