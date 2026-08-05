@@ -163,8 +163,13 @@ automatically.")
   (register push-light-user-data (Fn [&Lua (Ptr ())] ()) "lua_pushlightuserdata")
   (doc push-nil "Push nil onto the stack.")
   (register push-nil (Fn [&Lua] ()) "lua_pushnil")
-  (doc push-float "Push a float (Lua number) onto the stack.")
-  (register push-float (Fn [&Lua Float] ()) "lua_pushnumber")
+  (doc push-double "Push a double (Lua number) onto the stack. Lua numbers are
+C doubles, so this is the lossless way to hand Lua a number.")
+  (register push-double (Fn [&Lua Double] ()) "lua_pushnumber")
+  (doc push-float "Push a float onto the stack as a Lua number. Lua numbers are
+doubles, so the value arrives carrying only single precision; use
+[`push-double`](#push-double) to push the full value.")
+  (defn push-float [lua f] (push-double lua (Double.from-float f)))
   (doc push-string "Push a C string onto the stack. For Carp strings, use
 [`push-carp-str`](#push-carp-str) instead.")
   (deftemplate push-string
@@ -189,9 +194,15 @@ elements on the stack.")
   (doc get-int "Read the value at `index` as an integer. Does not check the
 type—use [`Luax.maybe-get-int`](#maybe-get-int) for a safe version.")
   (register get-int (Fn [&Lua Int] Int) "lua_tointeger")
-  (doc get-float "Read the value at `index` as a float. Does not check the
-type—use [`Luax.maybe-get-float`](#maybe-get-float) for a safe version.")
-  (register get-float (Fn [&Lua Int] Float) "lua_tonumber")
+  (doc get-double "Read the value at `index` as a double. Does not check the
+type—use [`Luax.maybe-get-double`](#maybe-get-double) for a safe version.")
+  (register get-double (Fn [&Lua Int] Double) "lua_tonumber")
+  (doc get-float "Read the value at `index` as a float. Lua numbers are doubles,
+so everything past single precision is dropped and anything above the float range
+comes back as an infinity; use [`get-double`](#get-double) to read the value
+intact. Does not check the type—use [`Luax.maybe-get-float`](#maybe-get-float)
+for a safe version.")
+  (defn get-float [lua index] (Double.to-float (get-double lua index)))
   (doc get-string "Read the value at `index` as a C string pointer. Returns a
 raw pointer; prefer [`Luax.get-carp-str`](#get-carp-str) or
 [`Luax.maybe-get-string`](#maybe-get-string) for safe access.")
@@ -595,19 +606,24 @@ the Lua standard library available.
 ```
 
 Values are passed between Carp and Lua through the stack. Push values with
-[`push-int`](#push-int), [`push-float`](#push-float),
+[`push-int`](#push-int), [`push-double`](#push-double),
 [`push-bool`](#push-bool), [`push-carp-str`](#push-carp-str), etc. Read them
-back with [`get-int`](#get-int), [`get-float`](#get-float), and so on, using
+back with [`get-int`](#get-int), [`get-double`](#get-double), and so on, using
 negative indices to address from the top of the stack (-1 is the top element).
 
 ```
 ; push two values, read the top one
 (Lua.push-int lua 42)
-(Lua.push-float lua 3.14f)
-(let [f (Lua.get-float lua -1)   ; 3.14
-      i (Lua.get-int lua -2)]    ; 42
+(Lua.push-double lua 3.14)
+(let [d (Lua.get-double lua -1)   ; 3.14
+      i (Lua.get-int lua -2)]     ; 42
   (Lua.pop lua 2))
 ```
+
+A Lua number is a C double. [`push-float`](#push-float) and
+[`get-float`](#get-float) still work, but they round to single precision and
+turn anything above the float range into an infinity, so prefer the `double`
+pair for numbers you care about.
 
 To call a Lua function at the low level, push the function, then its arguments,
 then use [`call`](#call) with the argument and result counts. The result
@@ -616,9 +632,9 @@ replaces the function and arguments on the stack.
 ```
 (Lua.get-global lua (cstr \"math\"))
 (ignore (Lua.get-field lua -1 (cstr \"sqrt\")))
-(Lua.push-float lua 9.0f)
+(Lua.push-double lua 9.0)
 (ignore (Lua.call lua 1 1 0))
-(IO.println &(str (Lua.get-float lua -1)))  ; 3.0
+(IO.println &(str (Lua.get-double lua -1)))  ; 3.0
 (Lua.pop lua 2)  ; pop result and math table
 ```
 
@@ -782,6 +798,11 @@ and assigns it to a global in one expression:
     (String.from-cstr-or (Lua.to-string lua index) @""))
 
   (luax--def-maybe-get int Lua.TYPE_NUMBER Lua.get-int "an integer" "a number")
+  (luax--def-maybe-get double
+                       Lua.TYPE_NUMBER
+                       Lua.get-double
+                       "a double"
+                       "a number")
   (luax--def-maybe-get float Lua.TYPE_NUMBER Lua.get-float "a float" "a number")
   (luax--def-maybe-get bool
                        Lua.TYPE_BOOLEAN
@@ -804,6 +825,7 @@ unchanged.")
         (Maybe.Nothing))))
 
   (luax--def-set-global int Lua.push-int)
+  (luax--def-set-global double Lua.push-double)
   (luax--def-set-global float Lua.push-float)
   (luax--def-set-global bool Lua.push-bool)
   ; `string` is defined explicitly rather than via luax--def-set-global: the
@@ -814,6 +836,11 @@ unchanged.")
     (do (Lua.push-carp-str lua value) (Lua.set-global lua (cstr name))))
 
   (luax--def-get-global int Lua.TYPE_NUMBER Lua.get-int "an integer" "a number")
+  (luax--def-get-global double
+                        Lua.TYPE_NUMBER
+                        Lua.get-double
+                        "a double"
+                        "a number")
   (luax--def-get-global float Lua.TYPE_NUMBER Lua.get-float "a float" "a number")
   (luax--def-get-global bool
                         Lua.TYPE_BOOLEAN
@@ -833,11 +860,17 @@ unchanged.")
         result)))
 
   (luax--def-set-field int Lua.push-int)
+  (luax--def-set-field double Lua.push-double)
   (luax--def-set-field float Lua.push-float)
   (luax--def-set-field bool Lua.push-bool)
   (luax--def-set-field string Lua.push-carp-str)
 
   (luax--def-get-field int Lua.TYPE_NUMBER Lua.get-int "an integer" "a number")
+  (luax--def-get-field double
+                       Lua.TYPE_NUMBER
+                       Lua.get-double
+                       "a double"
+                       "a number")
   (luax--def-get-field float Lua.TYPE_NUMBER Lua.get-float "a float" "a number")
   (luax--def-get-field bool
                        Lua.TYPE_BOOLEAN

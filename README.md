@@ -36,13 +36,18 @@ state and closes it when the block exits:
 ```
 
 The `Lua` module wraps the Lua C API directly: stack operations
-(`push-int`, `push-float`, `push-bool`, `push-string`, `get-int`, etc.),
+(`push-int`, `push-double`, `push-bool`, `push-string`, `get-int`, etc.),
 globals (`get-global`, `set-global`), tables (`create-table`, `set-field`,
 `get-field`, `next`), code execution (`do-string`, `do-file`, `call`), and
 type checking (`type-of`, `TYPE_NIL`, `TYPE_NUMBER`, etc.). It also provides a
 few conveniences: `Lua.fun` for defining Lua functions inline, `Lua.val` for
 evaluating Lua expressions into globals, and `Lua.eval-file` for loading Lua
 files with error handling.
+
+A Lua number is a C double, so `push-double` and `get-double` (and the matching
+`Luax.set-double-global`, `Luax.get-double-field`, …) move numbers across
+without losing anything. The `float` versions still work, but they round to
+single precision and turn anything above the float range into an infinity.
 
 The `Luax` module provides safe wrappers that return `Maybe` and `Result`
 types instead of requiring manual type checks:
