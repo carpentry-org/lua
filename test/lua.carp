@@ -48,6 +48,59 @@
     2.5f
     (Lua.with-lua-do (Lua.push-float lua 2.5f) (Lua.get-float lua -1))
     "push-float / get-float round-trip")
+  (assert-equal test
+    3.1415926535897931
+    (Lua.with-lua-do (Lua.push-double lua 3.1415926535897931)
+                     (Lua.get-double lua -1))
+    "push-double / get-double round-trip keeps all 17 significant digits")
+  (assert-equal test
+    16777217.0
+    (Lua.with-lua-do (Lua.libs lua)
+                     (ignore (Luax.do-in lua "n = 16777217"))
+                     (Lua.get-global lua (cstr "n"))
+                     (Lua.get-double lua -1))
+    "get-double reads a Lua integer above 2^24 intact")
+  (assert-true test
+    (let [n (Lua.with-lua-do (Lua.libs lua)
+                             (ignore (Luax.do-in lua "n = 1e300"))
+                             (Lua.get-global lua (cstr "n"))
+                             (Lua.get-double lua -1))]
+      (and (Double.> n 0.0) (Double.< n Double.MAX)))
+    "get-double reads 1e300 as a finite value")
+  (assert-true test
+    (let [n (Lua.with-lua-do (Lua.libs lua)
+                             (ignore (Luax.do-in lua "n = -1e300"))
+                             (Lua.get-global lua (cstr "n"))
+                             (Lua.get-double lua -1))]
+      (and (Double.< n 0.0) (Double.> n (Double.neg Double.MAX))))
+    "get-double reads -1e300 as a finite value")
+  (assert-equal test
+    3.1415926535897931
+    (Lua.with-lua-do (Lua.libs lua)
+                     (Lua.push-double lua 3.1415926535897931)
+                     (Lua.set-global lua (cstr "n"))
+                     (ignore (Luax.do-in lua "n = n * 2 / 2"))
+                     (Lua.get-global lua (cstr "n"))
+                     (Lua.get-double lua -1))
+    "push-double hands Lua the full value")
+
+  (assert-equal test
+    (Double.to-float 3.1415926535897931)
+    (Lua.with-lua-do (Lua.push-double lua 3.1415926535897931)
+                     (Lua.get-float lua -1))
+    "get-float still narrows to single precision")
+  (assert-true test
+    (Float.>
+      (Lua.with-lua-do (Lua.libs lua)
+                       (ignore (Luax.do-in lua "n = 1e300"))
+                       (Lua.get-global lua (cstr "n"))
+                       (Lua.get-float lua -1))
+      Float.MAX)
+    "get-float still overflows past the float range")
+  (assert-equal test
+    (Double.from-float 2.5f)
+    (Lua.with-lua-do (Lua.push-float lua 2.5f) (Lua.get-double lua -1))
+    "push-float still accepts a Float")
   (assert-true test
     (Lua.with-lua-do (Lua.push-bool lua true) (Lua.get-bool lua -1))
     "push-bool true round-trip")

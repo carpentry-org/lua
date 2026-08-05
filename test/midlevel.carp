@@ -32,6 +32,22 @@
     "maybe-get-float returns Nothing for boolean value")
 
   (assert-true test
+    (= &(Maybe.Just 3.1415926535897931)
+       &(Lua.with-lua-do (Lua.push-double lua 3.1415926535897931)
+                         (Luax.maybe-get-double lua -1)))
+    "maybe-get-double returns Just for number value")
+  (assert-true test
+    (Maybe.nothing?
+      &(Lua.with-lua-do (Lua.push-bool lua true) (Luax.maybe-get-double lua -1)))
+    "maybe-get-double returns Nothing for boolean value")
+  (assert-true test
+    (Maybe.nothing?
+      &(Lua.with-lua-do
+        (ignore (Lua.push-string lua (cstr "hello")))
+        (Luax.maybe-get-double lua -1)))
+    "maybe-get-double returns Nothing for string value")
+
+  (assert-true test
     (= &(Maybe.Just true)
        &(Lua.with-lua-do (Lua.push-bool lua true) (Luax.maybe-get-bool lua -1)))
     "maybe-get-bool returns Just true for true")
@@ -191,6 +207,22 @@
                      (Lua.get-float lua -1))
     "set-float-global sets a float global")
 
+  (assert-equal test
+    3.1415926535897931
+    (Lua.with-lua-do (Lua.libs lua)
+                     (Luax.set-double-global lua "d" 3.1415926535897931)
+                     (Lua.get-global lua (cstr "d"))
+                     (Lua.get-double lua -1))
+    "set-double-global sets a double global without losing precision")
+  (assert-true test
+    (let [n (Lua.with-lua-do (Lua.libs lua)
+                             (ignore (Luax.do-in lua "d = 1e300"))
+                             (ignore (Luax.do-in lua "d = d + 0"))
+                             (Lua.get-global lua (cstr "d"))
+                             (Lua.get-double lua -1))]
+      (and (Double.> n 0.0) (Double.< n Double.MAX)))
+    "double globals survive a round trip through Lua arithmetic")
+
   (assert-true test
     (Lua.with-lua-do (Lua.libs lua)
                      (Luax.set-bool-global lua "flag" true)
@@ -237,6 +269,23 @@
                          (Luax.set-float-global lua "f" 2.5f)
                          (Luax.get-float-global lua "f")))
     "get-float-global returns Just for existing float")
+
+  (assert-true test
+    (= &(Maybe.Just 3.1415926535897931)
+       &(Lua.with-lua-do (Lua.libs lua)
+                         (Luax.set-double-global lua "d" 3.1415926535897931)
+                         (Luax.get-double-global lua "d")))
+    "get-double-global returns Just for existing number")
+  (assert-true test
+    (Maybe.nothing?
+      &(Lua.with-lua-do (Lua.libs lua) (Luax.get-double-global lua "nope")))
+    "get-double-global returns Nothing for missing global")
+  (assert-true test
+    (Maybe.nothing?
+      &(Lua.with-lua-do (Lua.libs lua)
+                        (Luax.set-string-global lua "s" "hello")
+                        (Luax.get-double-global lua "s")))
+    "get-double-global returns Nothing for wrong type")
 
   (assert-true test
     (= &(Maybe.Just true)
@@ -303,6 +352,24 @@
     "get-float-field returns Just for existing float field")
 
   (assert-true test
+    (= &(Maybe.Just 3.1415926535897931)
+       &(Lua.with-lua-do (Lua.libs lua)
+                         (ignore
+                           (Lua.do-string lua
+                                          (cstr "t = {val = 3.141592653589793}")))
+                         (Lua.get-global lua (cstr "t"))
+                         (Luax.get-double-field lua -1 "val")))
+    "get-double-field returns Just for existing number field")
+  (assert-true test
+    (Maybe.nothing?
+      &(Lua.with-lua-do (Lua.libs lua)
+                        (ignore
+                          (Lua.do-string lua (cstr "t = {name = 'Alice'}")))
+                        (Lua.get-global lua (cstr "t"))
+                        (Luax.get-double-field lua -1 "name")))
+    "get-double-field returns Nothing on type mismatch")
+
+  (assert-true test
     (= &(Maybe.Just true)
        &(Lua.with-lua-do (Lua.libs lua)
                          (ignore
@@ -343,6 +410,17 @@
                      (ignore (Lua.get-field lua -1 (cstr "val")))
                      (Lua.get-float lua -1))
     "set-float-field sets a float field on a table")
+
+  (assert-equal test
+    3.1415926535897931
+    (Lua.with-lua-do (Lua.libs lua)
+                     (Lua.create-table lua 0 1)
+                     (Luax.set-double-field lua -1 "val" 3.1415926535897931)
+                     (Lua.set-global lua (cstr "t"))
+                     (Lua.get-global lua (cstr "t"))
+                     (ignore (Lua.get-field lua -1 (cstr "val")))
+                     (Lua.get-double lua -1))
+    "set-double-field sets a double field without losing precision")
 
   (assert-true test
     (Lua.with-lua-do (Lua.libs lua)

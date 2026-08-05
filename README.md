@@ -36,13 +36,21 @@ state and closes it when the block exits:
 ```
 
 The `Lua` module wraps the Lua C API directly: stack operations
-(`push-int`, `push-float`, `push-bool`, `push-string`, `get-int`, etc.),
+(`push-int`, `push-double`, `push-bool`, `push-string`, `get-int`, etc.),
 globals (`get-global`, `set-global`), tables (`create-table`, `set-field`,
 `get-field`, `next`), code execution (`do-string`, `do-file`, `call`), and
 type checking (`type-of`, `TYPE_NIL`, `TYPE_NUMBER`, etc.). It also provides a
 few conveniences: `Lua.fun` for defining Lua functions inline, `Lua.val` for
 evaluating Lua expressions into globals, and `Lua.eval-file` for loading Lua
 files with error handling.
+
+A Lua number is a C double, so `push-double` and `get-double` (and the matching
+`Luax.set-double-global`, `Luax.get-double-field`, …) carry Lua floats at full
+precision. The `float` versions still work — a float widens into a double
+exactly — but `get-float` narrows on the way back, so reading through it drops
+everything past single precision. Lua integers are a separate 64-bit subtype;
+`get-double` converts them to doubles, so integers above 2^53 are no longer all
+exactly representable and may come back rounded.
 
 The `Luax` module provides safe wrappers that return `Maybe` and `Result`
 types instead of requiring manual type checks:
@@ -58,8 +66,8 @@ types instead of requiring manual type checks:
 (Luax.make-table lua player
   (name (Lua.push-carp-str "Ada"))
   (hp (Lua.push-int 100))
-  (x (Lua.push-float 3.5f))
-  (y (Lua.push-float 7.0f)))
+  (x (Lua.push-double 3.5))
+  (y (Lua.push-double 7.0)))
 
 ; read table fields — returns Maybe, keeps the stack clean
 (Lua.get-global lua (cstr "player"))
