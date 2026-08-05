@@ -163,12 +163,9 @@ automatically.")
   (register push-light-user-data (Fn [&Lua (Ptr ())] ()) "lua_pushlightuserdata")
   (doc push-nil "Push nil onto the stack.")
   (register push-nil (Fn [&Lua] ()) "lua_pushnil")
-  (doc push-double "Push a double (Lua number) onto the stack. Lua numbers are
-C doubles, so this is the lossless way to hand Lua a number.")
+  (doc push-double "Push a double (Lua number) onto the stack.")
   (register push-double (Fn [&Lua Double] ()) "lua_pushnumber")
-  (doc push-float "Push a float onto the stack as a Lua number. Lua numbers are
-doubles, so the value arrives carrying only single precision; use
-[`push-double`](#push-double) to push the full value.")
+  (doc push-float "Push a float onto the stack as a Lua number.")
   (defn push-float [lua f] (push-double lua (Double.from-float f)))
   (doc push-string "Push a C string onto the stack. For Carp strings, use
 [`push-carp-str`](#push-carp-str) instead.")
@@ -198,10 +195,8 @@ type—use [`Luax.maybe-get-int`](#maybe-get-int) for a safe version.")
 type—use [`Luax.maybe-get-double`](#maybe-get-double) for a safe version.")
   (register get-double (Fn [&Lua Int] Double) "lua_tonumber")
   (doc get-float "Read the value at `index` as a float. Lua numbers are doubles,
-so everything past single precision is dropped and anything above the float range
-comes back as an infinity; use [`get-double`](#get-double) to read the value
-intact. Does not check the type—use [`Luax.maybe-get-float`](#maybe-get-float)
-for a safe version.")
+so this narrows; use [`get-double`](#get-double) instead. Does not check the
+type—use [`Luax.maybe-get-float`](#maybe-get-float) for a safe version.")
   (defn get-float [lua index] (Double.to-float (get-double lua index)))
   (doc get-string "Read the value at `index` as a C string pointer. Returns a
 raw pointer; prefer [`Luax.get-carp-str`](#get-carp-str) or
@@ -620,10 +615,10 @@ negative indices to address from the top of the stack (-1 is the top element).
   (Lua.pop lua 2))
 ```
 
-A Lua number is a C double. [`push-float`](#push-float) and
-[`get-float`](#get-float) still work, but they round to single precision and
-turn anything above the float range into an infinity, so prefer the `double`
-pair for numbers you care about.
+A Lua number is a C double. [`push-float`](#push-float) widens exactly, but
+[`get-float`](#get-float) narrows on the way back, so a number read through it
+loses everything past single precision and anything above the float range comes
+back as an infinity.
 
 To call a Lua function at the low level, push the function, then its arguments,
 then use [`call`](#call) with the argument and result counts. The result

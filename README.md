@@ -45,9 +45,11 @@ evaluating Lua expressions into globals, and `Lua.eval-file` for loading Lua
 files with error handling.
 
 A Lua number is a C double, so `push-double` and `get-double` (and the matching
-`Luax.set-double-global`, `Luax.get-double-field`, …) move numbers across
-without losing anything. The `float` versions still work, but they round to
-single precision and turn anything above the float range into an infinity.
+`Luax.set-double-global`, `Luax.get-double-field`, …) carry Lua floats at full
+precision. The `float` versions still work — a float widens into a double
+exactly — but `get-float` narrows on the way back, so reading through it drops
+everything past single precision. Lua integers are a separate 64-bit subtype;
+`get-double` converts them to doubles, so integers above 2^53 come back rounded.
 
 The `Luax` module provides safe wrappers that return `Maybe` and `Result`
 types instead of requiring manual type checks:
@@ -63,8 +65,8 @@ types instead of requiring manual type checks:
 (Luax.make-table lua player
   (name (Lua.push-carp-str "Ada"))
   (hp (Lua.push-int 100))
-  (x (Lua.push-float 3.5f))
-  (y (Lua.push-float 7.0f)))
+  (x (Lua.push-double 3.5))
+  (y (Lua.push-double 7.0)))
 
 ; read table fields — returns Maybe, keeps the stack clean
 (Lua.get-global lua (cstr "player"))
