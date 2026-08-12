@@ -46,25 +46,29 @@ the Lua standard library available.</p>
   (ignore (Lua.do-string lua (cstr &quot;print('hello from lua')&quot;))))
 </code></pre>
 <p>Values are passed between Carp and Lua through the stack. Push values with
-<a href="#push-int"><code>push-int</code></a>, <a href="#push-float"><code>push-float</code></a>,
+<a href="#push-int"><code>push-int</code></a>, <a href="#push-double"><code>push-double</code></a>,
 <a href="#push-bool"><code>push-bool</code></a>, <a href="#push-carp-str"><code>push-carp-str</code></a>, etc. Read them
-back with <a href="#get-int"><code>get-int</code></a>, <a href="#get-float"><code>get-float</code></a>, and so on, using
+back with <a href="#get-int"><code>get-int</code></a>, <a href="#get-double"><code>get-double</code></a>, and so on, using
 negative indices to address from the top of the stack (-1 is the top element).</p>
 <pre><code>; push two values, read the top one
 (Lua.push-int lua 42)
-(Lua.push-float lua 3.14f)
-(let [f (Lua.get-float lua -1)   ; 3.14
-      i (Lua.get-int lua -2)]    ; 42
+(Lua.push-double lua 3.14)
+(let [d (Lua.get-double lua -1)   ; 3.14
+      i (Lua.get-int lua -2)]     ; 42
   (Lua.pop lua 2))
 </code></pre>
+<p>A Lua number is a C double. <a href="#push-float"><code>push-float</code></a> widens exactly, but
+<a href="#get-float"><code>get-float</code></a> narrows on the way back, so a number read through it
+loses everything past single precision and anything above the float range comes
+back as an infinity.</p>
 <p>To call a Lua function at the low level, push the function, then its arguments,
 then use <a href="#call"><code>call</code></a> with the argument and result counts. The result
 replaces the function and arguments on the stack.</p>
 <pre><code>(Lua.get-global lua (cstr &quot;math&quot;))
 (ignore (Lua.get-field lua -1 (cstr &quot;sqrt&quot;)))
-(Lua.push-float lua 9.0f)
+(Lua.push-double lua 9.0)
 (ignore (Lua.call lua 1 1 0))
-(IO.println &amp;(str (Lua.get-float lua -1)))  ; 3.0
+(IO.println &amp;(str (Lua.get-double lua -1)))  ; 3.0
 (Lua.pop lua 2)  ; pop result and math table
 </code></pre>
 <p>Tables are built by creating an empty table with <a href="#create-table"><code>create-table</code></a>,
@@ -585,7 +589,8 @@ Use <a href="#do-in"><code>Luax.do-in</code></a> for a version that returns <cod
                     </pre>
                     <p class="doc">
                         <p>Load and execute the Lua file at <code>path</code>. Returns <code>(Success &quot;&quot;)</code>
-on success or <code>(Error msg)</code> with the Lua error message on failure.</p>
+on success or <code>(Error msg)</code> with the Lua error message on failure. Leaves the
+stack unchanged in both cases.</p>
 
                     </p>
                 </div>
@@ -659,6 +664,27 @@ global, <code>args</code> is a list of parameter names, and <code>body</code> is
                     </p>
                 </div>
                 <div class="binder">
+                    <a class="anchor" href="#get-double">
+                        <h3 id="get-double">
+                            get-double
+                        </h3>
+                    </a>
+                    <div class="description">
+                        external
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Int] Double)
+                    </p>
+                    <span>
+                        
+                    </span>
+                    <p class="doc">
+                        <p>Read the value at <code>index</code> as a double. Does not check the
+type—use <a href="#maybe-get-double"><code>Luax.maybe-get-double</code></a> for a safe version.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
                     <a class="anchor" href="#get-field">
                         <h3 id="get-field">
                             get-field
@@ -686,16 +712,17 @@ the stack. Returns a type constant.</p>
                         </h3>
                     </a>
                     <div class="description">
-                        external
+                        defn
                     </div>
                     <p class="sig">
                         (Fn [(Ref Lua a), Int] Float)
                     </p>
-                    <span>
-                        
-                    </span>
+                    <pre class="args">
+                        (get-float lua index)
+                    </pre>
                     <p class="doc">
-                        <p>Read the value at <code>index</code> as a float. Does not check the
+                        <p>Read the value at <code>index</code> as a float. Lua numbers are doubles,
+so this narrows; use <a href="#get-double"><code>get-double</code></a> instead. Does not check the
 type—use <a href="#maybe-get-float"><code>Luax.maybe-get-float</code></a> for a safe version.</p>
 
                     </p>
@@ -802,8 +829,9 @@ raw pointer; prefer <a href="#get-carp-str"><code>Luax.get-carp-str</code></a> o
                     </pre>
                     <p class="doc">
                         <p>Fetch the global <code>name</code> and return it as a Carp
-<code>String</code>. Returns an empty string if the global is nil or not a string. For a
-safe version returning <code>Maybe</code>, see <a href="#get-string-global"><code>Luax.get-string-global</code></a>.</p>
+<code>String</code>. Returns an empty string if the global is nil or not a string. Pops the
+global from the stack internally. For a safe version returning <code>Maybe</code>, see
+<a href="#get-string-global"><code>Luax.get-string-global</code></a>.</p>
 
                     </p>
                 </div>
@@ -1209,22 +1237,42 @@ C function. The function must have been declared with
                     </p>
                 </div>
                 <div class="binder">
-                    <a class="anchor" href="#push-float">
-                        <h3 id="push-float">
-                            push-float
+                    <a class="anchor" href="#push-double">
+                        <h3 id="push-double">
+                            push-double
                         </h3>
                     </a>
                     <div class="description">
                         external
                     </div>
                     <p class="sig">
-                        (Fn [(Ref Lua a), Float] ())
+                        (Fn [(Ref Lua a), Double] ())
                     </p>
                     <span>
                         
                     </span>
                     <p class="doc">
-                        <p>Push a float (Lua number) onto the stack.</p>
+                        <p>Push a double (Lua number) onto the stack.</p>
+
+                    </p>
+                </div>
+                <div class="binder">
+                    <a class="anchor" href="#push-float">
+                        <h3 id="push-float">
+                            push-float
+                        </h3>
+                    </a>
+                    <div class="description">
+                        defn
+                    </div>
+                    <p class="sig">
+                        (Fn [(Ref Lua a), Float] ())
+                    </p>
+                    <pre class="args">
+                        (push-float lua f)
+                    </pre>
+                    <p class="doc">
+                        <p>Push a float onto the stack as a Lua number.</p>
 
                     </p>
                 </div>
@@ -1790,7 +1838,9 @@ null pointer if the value is not a thread.</p>
                     </pre>
                     <p class="doc">
                         <p>Evaluate the Lua expression <code>value</code> and assign the result to the
-global <code>name</code>. Returns <code>OK</code> on success.</p>
+global <code>name</code>. Returns <code>OK</code> on success. On failure the Lua error object is
+discarded, leaving the stack unchanged; use <a href="#do-in"><code>Luax.do-in</code></a> if you need
+the message.</p>
 <pre><code>(Lua.val lua &quot;pi&quot; &quot;3.14159&quot;)
 </code></pre>
 

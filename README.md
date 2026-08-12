@@ -6,7 +6,7 @@ API, and `Luax` for a safer, higher-level interface built on top of it.
 ## Installation
 
 ```clojure
-(load "https://github.com/carpentry-org/lua@0.4.0")
+(load "https://github.com/carpentry-org/lua@0.5.0")
 
 ; tell Carp where your Lua headers live
 (Lua.setup "lua")

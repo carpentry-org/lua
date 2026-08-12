@@ -1,4 +1,4 @@
-(load "https://github.com/carpentry-org/lua@0.4.0")
+(load "https://github.com/carpentry-org/lua@0.5.0")
 
 (Lua.setup "lua")
 
