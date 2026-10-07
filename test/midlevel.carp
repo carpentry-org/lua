@@ -6,6 +6,27 @@
 (add-cflag "-L/opt/homebrew/lib")
 (Lua.setup "lua")
 
+(defn int-reads [value]
+  (Lua.with-lua-do (Lua.libs lua)
+                   (ignore (Luax.do-in lua &(str* "x = " value "; t = {x = x}")))
+                   (Lua.get-global lua (cstr "t"))
+                   (Lua.get-global lua (cstr "x"))
+                   (let-do [direct (Luax.maybe-get-int lua -1)]
+                     (Lua.pop lua 1)
+                     [direct
+                      (Luax.get-int-global lua "x")
+                      (Luax.get-int-field lua -1 "x")])))
+
+(defn int-reads-top [value]
+  (Lua.with-lua-do (Lua.libs lua)
+                   (ignore (Luax.do-in lua &(str* "x = " value "; t = {x = x}")))
+                   (Lua.get-global lua (cstr "t"))
+                   (Lua.get-global lua (cstr "x"))
+                   (ignore (Luax.maybe-get-int lua -1))
+                   (ignore (Luax.get-int-global lua "x"))
+                   (ignore (Luax.get-int-field lua -2 "x"))
+                   (Lua.get-top lua)))
+
 (deftest test
   (assert-true test
     (= &(Maybe.Just 42)
@@ -21,6 +42,95 @@
     (Maybe.nothing?
       &(Lua.with-lua-do (Lua.push-nil lua) (Luax.maybe-get-int lua -1)))
     "maybe-get-int returns Nothing for nil")
+
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Just 42))
+    &(int-reads "42")
+    "int getters read a Lua integer")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Just 2))
+    &(int-reads "2.0")
+    "int getters read a whole float")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Just 0))
+    &(int-reads "-0.0")
+    "int getters read negative zero as 0")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Just Int.MAX))
+    &(int-reads "2^31 - 1")
+    "int getters read Int.MAX")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Just Int.MIN))
+    &(int-reads "-2^31")
+    "int getters read Int.MIN")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Just Int.MIN))
+    &(int-reads "-2147483648")
+    "int getters read Int.MIN as a Lua integer")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Nothing))
+    &(int-reads "2.5")
+    "int getters reject a fractional number")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Nothing))
+    &(int-reads "-2.5")
+    "int getters reject a negative fractional number")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Nothing))
+    &(int-reads "2^31")
+    "int getters reject a float above Int.MAX")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Nothing))
+    &(int-reads "2147483648")
+    "int getters reject a Lua integer above Int.MAX")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Nothing))
+    &(int-reads "-2^31 - 1")
+    "int getters reject a float below Int.MIN")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Nothing))
+    &(int-reads "-2147483649")
+    "int getters reject a Lua integer below Int.MIN")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Nothing))
+    &(int-reads "4294967338")
+    "int getters reject a Lua integer that wraps to a small Int")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Nothing))
+    &(int-reads "2^53")
+    "int getters reject 2^53")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Nothing))
+    &(int-reads "math.maxinteger")
+    "int getters reject math.maxinteger")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Nothing))
+    &(int-reads "0/0")
+    "int getters reject NaN")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Nothing))
+    &(int-reads "1/0")
+    "int getters reject inf")
+  (assert-equal test
+    &(Array.replicate 3 &(Maybe.Nothing))
+    &(int-reads "-1/0")
+    "int getters reject -inf")
+  (assert-equal test
+    2
+    (int-reads-top "42")
+    "int getters leave the stack as documented")
+  (assert-equal test
+    2
+    (int-reads-top "2.5")
+    "int getters leave the stack as documented for a fractional number")
+  (assert-equal test
+    2
+    (int-reads-top "2^31")
+    "int getters leave the stack as documented out of Int range")
+  (assert-equal test
+    2
+    (int-reads-top "0/0")
+    "int getters leave the stack as documented for NaN")
 
   (assert-true test
     (= &(Maybe.Just 2.5f)

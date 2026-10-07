@@ -63,8 +63,9 @@
         (defn %fn-name [lua name value]
           (do (%pusher lua value) (Lua.set-global lua (cstr name))))))))
 
-(defmacro luax--def-get-global [suffix type-const getter article type-article]
+(defmacro luax--def-get-global [suffix article type-article]
   (let [fn-name (Symbol.concat ['get- suffix '-global])
+        maybe-get (Symbol.concat ['maybe-get- suffix])
         doc-str (Dynamic.String.concat
           ["Fetch the global `name` as "
            article
@@ -77,11 +78,7 @@
         (defn %fn-name [lua name]
           (do
             (Lua.get-global lua (cstr name))
-            (let-do [result (if (= (Lua.type-of lua -1) %type-const)
-                       (Maybe.Just (%getter lua -1))
-                       (Maybe.Nothing))]
-              (Lua.pop lua 1)
-              result)))))))
+            (let-do [result (%maybe-get lua -1)] (Lua.pop lua 1) result)))))))
 
 (defmacro luax--def-set-field [suffix pusher]
   (let [fn-name (Symbol.concat ['set- suffix '-field])]
@@ -94,8 +91,9 @@
             (%pusher lua value)
             (Lua.set-field lua (if (< index 0) (- index 1) index) (cstr name))))))))
 
-(defmacro luax--def-get-field [suffix type-const getter article type-article]
+(defmacro luax--def-get-field [suffix article type-article]
   (let [fn-name (Symbol.concat ['get- suffix '-field])
+        maybe-get (Symbol.concat ['maybe-get- suffix])
         doc-str (Dynamic.String.concat
           ["Read field `name` from the table at `index` as "
            article
@@ -108,11 +106,7 @@
         (defn %fn-name [lua index name]
           (do
             (ignore (Lua.get-field lua index (cstr name)))
-            (let-do [result (if (= (Lua.type-of lua -1) %type-const)
-                       (Maybe.Just (%getter lua -1))
-                       (Maybe.Nothing))]
-              (Lua.pop lua 1)
-              result)))))))
+            (let-do [result (%maybe-get lua -1)] (Lua.pop lua 1) result)))))))
 
 (defmodule Lua
   (doc OK "Status code returned on success.")
@@ -792,7 +786,6 @@ and assigns it to a global in one expression:
   (defn get-carp-str [lua index]
     (String.from-cstr-or (Lua.to-string lua index) @""))
 
-  (luax--def-maybe-get int Lua.TYPE_NUMBER Lua.get-int "an integer" "a number")
   (luax--def-maybe-get double
                        Lua.TYPE_NUMBER
                        Lua.get-double
@@ -809,6 +802,19 @@ and assigns it to a global in one expression:
                        get-carp-str
                        "a Carp `String`"
                        "a string")
+
+  (defn- exact-int [d]
+    (if (and (>= d (Double.from-int Int.MIN))
+             (<= d (Double.from-int Int.MAX))
+             (= d (Double.floor d)))
+      (Maybe.Just (Double.to-int d))
+      (Maybe.Nothing)))
+
+  (doc maybe-get-int "Read the value at `index` as an integer, returning
+`Nothing` if it is not a whole number that fits in an `Int`. Leaves the stack
+unchanged.")
+  (defn maybe-get-int [lua index]
+    (Maybe.and-then (maybe-get-double lua index) &exact-int))
 
   (doc maybe-get-userdata "Read the value at `index` as a userdata pointer,
 returning `Nothing` if it is not a full or light userdata. Leaves the stack
@@ -830,18 +836,10 @@ unchanged.")
   (defn set-string-global [lua name value]
     (do (Lua.push-carp-str lua value) (Lua.set-global lua (cstr name))))
 
-  (luax--def-get-global int Lua.TYPE_NUMBER Lua.get-int "an integer" "a number")
-  (luax--def-get-global double
-                        Lua.TYPE_NUMBER
-                        Lua.get-double
-                        "a double"
-                        "a number")
-  (luax--def-get-global float Lua.TYPE_NUMBER Lua.get-float "a float" "a number")
-  (luax--def-get-global bool
-                        Lua.TYPE_BOOLEAN
-                        Lua.get-bool
-                        "a boolean"
-                        "a boolean")
+  (luax--def-get-global int "an integer" "a whole number that fits in an `Int`")
+  (luax--def-get-global double "a double" "a number")
+  (luax--def-get-global float "a float" "a number")
+  (luax--def-get-global bool "a boolean" "a boolean")
   ; `string` defined explicitly for the same reason as set-string-global above.
   (doc get-string-global
     "Fetch the global `name` as a Carp `String`. Returns `Nothing` if the global is nil or not a string. Pops the global from the stack internally.")
@@ -860,23 +858,11 @@ unchanged.")
   (luax--def-set-field bool Lua.push-bool)
   (luax--def-set-field string Lua.push-carp-str)
 
-  (luax--def-get-field int Lua.TYPE_NUMBER Lua.get-int "an integer" "a number")
-  (luax--def-get-field double
-                       Lua.TYPE_NUMBER
-                       Lua.get-double
-                       "a double"
-                       "a number")
-  (luax--def-get-field float Lua.TYPE_NUMBER Lua.get-float "a float" "a number")
-  (luax--def-get-field bool
-                       Lua.TYPE_BOOLEAN
-                       Lua.get-bool
-                       "a boolean"
-                       "a boolean")
-  (luax--def-get-field string
-                       Lua.TYPE_STRING
-                       get-carp-str
-                       "a Carp `String`"
-                       "a string")
+  (luax--def-get-field int "an integer" "a whole number that fits in an `Int`")
+  (luax--def-get-field double "a double" "a number")
+  (luax--def-get-field float "a float" "a number")
+  (luax--def-get-field bool "a boolean" "a boolean")
+  (luax--def-get-field string "a Carp `String`" "a string")
 
   (doc do-in
     "Compile and execute the Lua string `code`. Returns `(Success \"\")`
