@@ -47,21 +47,19 @@
            ", returning `Nothing` if it is not "
            type-article
            ". Leaves the stack unchanged."])]
-    (eval
-      `(do
-        (doc %fn-name %doc-str)
-        (defn %fn-name [lua index]
-          (if (= (Lua.type-of lua index) %type-const)
-            (Maybe.Just (%getter lua index))
-            (Maybe.Nothing)))))))
+    `(do
+      (doc %fn-name %doc-str)
+      (defn %fn-name [lua index]
+        (if (= (Lua.type-of lua index) %type-const)
+          (Maybe.Just (%getter lua index))
+          (Maybe.Nothing))))))
 
 (defmacro luax--def-set-global [suffix pusher]
   (let [fn-name (Symbol.concat ['set- suffix '-global])]
-    (eval
-      `(do
-        (doc %fn-name "Push `value` and assign it to the global `name`.")
-        (defn %fn-name [lua name value]
-          (do (%pusher lua value) (Lua.set-global lua (cstr name))))))))
+    `(do
+      (doc %fn-name "Push `value` and assign it to the global `name`.")
+      (defn %fn-name [lua name value]
+        (do (%pusher lua value) (Lua.set-global lua (cstr name)))))))
 
 (defmacro luax--def-get-global [suffix article type-article]
   (let [fn-name (Symbol.concat ['get- suffix '-global])
@@ -72,24 +70,22 @@
            ". Returns `Nothing` if the global is nil or not "
            type-article
            ". Pops the global from the stack internally."])]
-    (eval
-      `(do
-        (doc %fn-name %doc-str)
-        (defn %fn-name [lua name]
-          (do
-            (Lua.get-global lua (cstr name))
-            (let-do [result (%maybe-get lua -1)] (Lua.pop lua 1) result)))))))
+    `(do
+      (doc %fn-name %doc-str)
+      (defn %fn-name [lua name]
+        (do
+          (Lua.get-global lua (cstr name))
+          (let-do [result (%maybe-get lua -1)] (Lua.pop lua 1) result))))))
 
 (defmacro luax--def-set-field [suffix pusher]
   (let [fn-name (Symbol.concat ['set- suffix '-field])]
-    (eval
-      `(do
-        (doc %fn-name
-          "Set field `name` to `value` on the table at `index`. Handles the stack index shift from pushing the value internally.")
-        (defn %fn-name [lua index name value]
-          (do
-            (%pusher lua value)
-            (Lua.set-field lua (if (< index 0) (- index 1) index) (cstr name))))))))
+    `(do
+      (doc %fn-name
+        "Set field `name` to `value` on the table at `index`. Handles the stack index shift from pushing the value internally.")
+      (defn %fn-name [lua index name value]
+        (do
+          (%pusher lua value)
+          (Lua.set-field lua (if (< index 0) (- index 1) index) (cstr name)))))))
 
 (defmacro luax--def-get-field [suffix article type-article]
   (let [fn-name (Symbol.concat ['get- suffix '-field])
@@ -100,13 +96,12 @@
            ". Returns `Nothing` if the field is nil or not "
            type-article
            ". Pops the field value from the stack internally, leaving only the table."])]
-    (eval
-      `(do
-        (doc %fn-name %doc-str)
-        (defn %fn-name [lua index name]
-          (do
-            (ignore (Lua.get-field lua index (cstr name)))
-            (let-do [result (%maybe-get lua -1)] (Lua.pop lua 1) result)))))))
+    `(do
+      (doc %fn-name %doc-str)
+      (defn %fn-name [lua index name]
+        (do
+          (ignore (Lua.get-field lua index (cstr name)))
+          (let-do [result (%maybe-get lua -1)] (Lua.pop lua 1) result))))))
 
 (defmodule Lua
   (doc OK "Status code returned on success.")
